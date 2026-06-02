@@ -88,3 +88,9 @@ com.unity.textmeshpro
 
 # Mac general files
 .DS_Store
+
+# Echo-Motion: großes Whisper-Modell nicht versionieren (zu groß für GitHub,
+# pro Rechner lokal herunterladen). Muss nach der *.meta-Negation oben stehen,
+# damit auch die zugehörige .meta ignoriert wird. ggml-tiny.bin bleibt getrackt.
+**/[Aa]ssets/[Ss]treamingAssets/Whisper/ggml-small*.bin
+**/[Aa]ssets/[Ss]treamingAssets/Whisper/ggml-small*.bin.meta
