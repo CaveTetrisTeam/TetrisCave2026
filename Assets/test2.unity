@@ -136,6 +136,9 @@ GameObject:
   - component: {fileID: 99382784}
   - component: {fileID: 99382779}
   - component: {fileID: 99382778}
+  - component: {fileID: 99382789}
+  - component: {fileID: 99382788}
+  - component: {fileID: 99382787}
   m_Layer: 0
   m_Name: SpeechManager
   m_TagString: Untagged
@@ -192,7 +195,7 @@ MonoBehaviour:
   loop: 0
   frequency: 16000
   chunksLengthSec: 0.5
-  echo: 1
+  echo: 0
   useVad: 1
   vadUpdateRateSec: 0.1
   vadContextSec: 30
@@ -263,6 +266,68 @@ MonoBehaviour:
   microphoneRecord: {fileID: 99382779}
   printLanguage: 1
   autoInitWhisper: 1
+--- !u!114 &99382787
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 99382777}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 361b0054f9f8e4176a57e7b1d8dbf5cc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  voiceQuestion: {fileID: 99382789}
+  showWhileListening: []
+  micIcon: {fileID: 864916114}
+  targetRenderer: {fileID: 0}
+  quietColor: {r: 0.6, g: 0.62, b: 0.65, a: 1}
+  loudColor: {r: 0.85, g: 0.22, b: 0.22, a: 1}
+  scaleTarget: {fileID: 864916115}
+  maxScale: 1.6
+  loudnessGain: 20
+  responseSpeed: 14
+  chunkSeconds: 0.1
+--- !u!114 &99382788
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 99382777}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d9efee198ce364054aa037bbc01246d3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  voiceQuestion: {fileID: 99382789}
+  askKey: 113
+  questionText: 'Welche Farbe hat die Form? (richtig: blau)'
+  acceptedAnswers:
+  - blau
+  - blaue
+  - blauer
+  pauseDuringQuestion: 0
+--- !u!114 &99382789
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 99382777}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a10bac9f8e3254d5a99e65cba8806c15, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  speechToText: {fileID: 99382786}
+  microphoneRecord: {fileID: 99382779}
+  maxAttempts: 3
+  noSpeechTimeout: 8
+  micStartDelay: 0
+  configureVad: 1
+  vadStopTime: 1.5
 --- !u!1 &705507993
 GameObject:
   m_ObjectHideFlags: 0
@@ -357,6 +422,90 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 50, y: -30, z: 0}
+--- !u!1 &864916113
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 864916115}
+  - component: {fileID: 864916114}
+  m_Layer: 0
+  m_Name: MicIndicatorIcon
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!212 &864916114
+SpriteRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 864916113}
+  m_Enabled: 1
+  m_CastShadows: 0
+  m_ReceiveShadows: 0
+  m_DynamicOccludee: 1
+  m_StaticShadowCaster: 0
+  m_MotionVectors: 1
+  m_LightProbeUsage: 1
+  m_ReflectionProbeUsage: 1
+  m_RayTracingMode: 0
+  m_RayTraceProcedural: 0
+  m_RenderingLayerMask: 1
+  m_RendererPriority: 0
+  m_Materials:
+  - {fileID: 10754, guid: 0000000000000000f000000000000000, type: 0}
+  m_StaticBatchInfo:
+    firstSubMesh: 0
+    subMeshCount: 0
+  m_StaticBatchRoot: {fileID: 0}
+  m_ProbeAnchor: {fileID: 0}
+  m_LightProbeVolumeOverride: {fileID: 0}
+  m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
+  m_PreserveUVs: 0
+  m_IgnoreNormalsForChartDetection: 0
+  m_ImportantGI: 0
+  m_StitchLightmapSeams: 1
+  m_SelectedEditorRenderState: 0
+  m_MinimumChartSize: 4
+  m_AutoUVMaxDistance: 0.5
+  m_AutoUVMaxAngle: 89
+  m_LightmapParameters: {fileID: 0}
+  m_SortingLayerID: 0
+  m_SortingLayer: 0
+  m_SortingOrder: 0
+  m_Sprite: {fileID: 3286163911610860551, guid: 6cc645645d8bc45b4b09e86347a40286, type: 3}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_FlipX: 0
+  m_FlipY: 0
+  m_DrawMode: 0
+  m_Size: {x: 0.77, y: 1.185}
+  m_AdaptiveModeThreshold: 0.5
+  m_SpriteTileMode: 0
+  m_WasSpriteAssigned: 1
+  m_MaskInteraction: 0
+  m_SpriteSortPoint: 0
+--- !u!4 &864916115
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 864916113}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 1, z: -8}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &963194225
 GameObject:
   m_ObjectHideFlags: 0
@@ -456,3 +605,4 @@ SceneRoots:
   - {fileID: 963194228}
   - {fileID: 705507995}
   - {fileID: 99382783}
+  - {fileID: 864916115}
