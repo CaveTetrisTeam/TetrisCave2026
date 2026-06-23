@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using UnityEditor;
 using UnityEngine;
 /// <summary>
 /// Takes the tracked Kinect positions from the Kinect Actor instances (Cave --> Kinect Tracker --> Kinect Actor # ...)
@@ -214,10 +213,26 @@ public class PositionTransferMultiple : MonoBehaviour
             bodypart.name = name;
             bodypart.transform.parent = avatarRoots[actorId].transform;
 
-            if (bodypart.GetComponent<Rigidbody>() == null)
-                bodypart.AddComponent<Rigidbody>();
+            // Rigidbody positionsgesteuert konfigurieren: kinematisch + keine Schwerkraft.
+            // Sonst würde der Avatar "fallen" und die Trigger-Erkennung der Wände stören.
+            Rigidbody rb = bodypart.GetComponent<Rigidbody>();
+            if (rb == null)
+                rb = bodypart.AddComponent<Rigidbody>();
+            rb.isKinematic = true;
+            rb.useGravity = false;
+
             if (bodypart.GetComponent<Collider>() == null)
                 bodypart.AddComponent<BoxCollider>();
+
+            // Marker, damit die Wände (WallHitZone) Körperteil-Treffer erkennen –
+            // funktioniert auch, wenn der Layer "Player" (noch) nicht angelegt ist.
+            if (bodypart.GetComponent<CaveGame.PlayerBodyPart>() == null)
+                bodypart.AddComponent<CaveGame.PlayerBodyPart>();
+
+            // Zusätzlich Layer "Player" zuweisen, falls vorhanden (saubere Collision-Matrix).
+            int playerLayer = LayerMask.NameToLayer("Player");
+            if (playerLayer >= 0)
+                bodypart.layer = playerLayer;
 
             BodyCollision bodyCollision = bodypart.AddComponent<BodyCollision>();
             if (particlePrefab != null)

@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
@@ -7,6 +8,13 @@ namespace HumanTetris
     public sealed class HumanTetrisStartMenu : MonoBehaviour
     {
         private const string MenuObjectName = "HumanTetris Start Menu";
+
+        /// <summary>
+        /// Wird ausgelöst, wenn der Start angefordert wird – egal ob über den
+        /// klassischen UI-Button, die Tastatur oder den physischen Kinect-Knopf.
+        /// Der CaveGame-GameManager hört darauf und wechselt in den Spielablauf.
+        /// </summary>
+        public static event Action StartRequested;
 
         private static HumanTetrisStartMenu _instance;
         private static Font _cachedMenuFont;
@@ -49,6 +57,41 @@ namespace HumanTetris
                 _instance.RefreshHighscore();
                 _instance.Show();
             }
+        }
+
+        /// <summary>Stellt sicher, dass das Menü existiert und sichtbar ist.</summary>
+        public static void ShowMenu()
+        {
+            EnsureMenuExists();
+        }
+
+        /// <summary>Versteckt das Menü (falls vorhanden).</summary>
+        public static void HideMenu()
+        {
+            if (_instance != null)
+            {
+                _instance.Hide();
+            }
+        }
+
+        /// <summary>Start anfordern (statischer Einstieg, z. B. für den physischen Knopf).</summary>
+        public static void RequestStartStatic()
+        {
+            EnsureMenuExists();
+            if (_instance != null)
+            {
+                _instance.RequestStart();
+            }
+        }
+
+        /// <summary>
+        /// Löst den Spielstart aus: meldet <see cref="StartRequested"/> und versteckt das Menü.
+        /// Wird vom UI-Button, der Tastatur und dem physischen Kinect-Knopf genutzt.
+        /// </summary>
+        public void RequestStart()
+        {
+            StartRequested?.Invoke();
+            Hide();
         }
 
         public void Show()
@@ -125,7 +168,7 @@ namespace HumanTetris
 
             if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.Space))
             {
-                Hide();
+                RequestStart();
             }
         }
 
@@ -205,7 +248,7 @@ namespace HumanTetris
 
             var startButton = CreateButton(panel.transform);
             SetRect(startButton.GetComponent<RectTransform>(), 0f, -145f, 360f, 90f);
-            startButton.onClick.AddListener(Hide);
+            startButton.onClick.AddListener(RequestStart);
 
             RefreshHighscore();
         }
