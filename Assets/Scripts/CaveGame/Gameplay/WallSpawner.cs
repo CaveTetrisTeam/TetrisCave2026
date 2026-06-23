@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using Windows.Kinect;
 
 namespace CaveGame
 {
@@ -35,6 +36,18 @@ namespace CaveGame
         [Tooltip("Y-Drehung der Wand. Bei gespiegelter/abgewandter Darstellung 180 versuchen.")]
         public float wallYRotation = 0f;
 
+        [Header("Automatische Körperkalibrierung")]
+        [Tooltip("Skaliert alle Posen einheitlich anhand der getrackten Körpergröße.")]
+        public bool adaptToTrackedPlayer = true;
+        [Tooltip("Zusätzlicher Spielraum in der Körperöffnung (Meter). Vergrößert Höhe und Breite proportional.")]
+        public float poseClearance = 0.18f;
+        [Tooltip("Zusätzlicher Freiraum unter den Füßen (Meter).")]
+        public float lowerClearance = 0.04f;
+        [Tooltip("Verschiebt die komplette Wand leicht nach unten (Meter).")]
+        public float wallVerticalOffset = -0.05f;
+        [Tooltip("Ersatz-Körpergröße ohne zuverlässiges Kinect-Tracking.")]
+        public float fallbackPlayerHeight = 1.75f;
+
         [Header("Collider-Generierung")]
         [Tooltip("Spalten des Abtast-Gitters. Höher = genauer, aber mehr Collider.")]
         public int gridColumns = 48;
@@ -61,10 +74,15 @@ namespace CaveGame
         private Sprite[] m_Sprites;
         private Coroutine m_SpawnRoutine;
         private float m_PlayStartTime;
+        private KinectPlayerPresence m_PlayerPresence;
+        private float m_SessionScale;
+        private float m_SessionFloorY;
 
         private void Awake()
         {
             EnsureSprites();
+            m_PlayerPresence = FindObjectOfType<KinectPlayerPresence>(true);
+            CalibrateForCurrentPlayer();
         }
 
         // ---------------------------------------------------------------------
@@ -74,6 +92,7 @@ namespace CaveGame
         public void StartSpawning()
         {
             m_PlayStartTime = Time.time;
+            CalibrateForCurrentPlayer();
             if (m_SpawnRoutine == null)
             {
                 m_SpawnRoutine = StartCoroutine(SpawnLoop());
@@ -157,7 +176,6 @@ namespace CaveGame
         {
             var go = new GameObject("Wall_" + sprite.name);
             go.transform.SetParent(transform, false);
-            go.transform.position = new Vector3(wallCenter.x, wallCenter.y, spawnZ);
             go.transform.rotation = Quaternion.Euler(0f, wallYRotation, 0f);
 
             int wallLayer = LayerMask.NameToLayer("Wall");
@@ -168,8 +186,19 @@ namespace CaveGame
 
             // Maßstab auf gewünschte Welthöhe (Sprite ist unskaliert sprite.bounds groß).
             float localHeight = Mathf.Max(0.0001f, sprite.bounds.size.y);
-            float scale = targetWorldHeight / localHeight;
+            float scale = m_SessionScale > 0f ? m_SessionScale : targetWorldHeight / localHeight;
             go.transform.localScale = new Vector3(scale, scale, scale);
+
+            float calibratedY = wallCenter.y + wallVerticalOffset;
+            if (WallColliderBuilder.TryGetInteriorHoleBounds(
+                    sprite, Mathf.Max(64, gridColumns * 2), alphaThreshold, out var hole))
+            {
+                // Öffnung knapp unter den getrackten Füßen ansetzen. Das ist der
+                // gewünschte kleine Spielraum plus die minimale Absenkung.
+                float desiredHoleBottom = m_SessionFloorY - lowerClearance + wallVerticalOffset;
+                calibratedY = desiredHoleBottom - hole.min.y * scale;
+            }
+            go.transform.position = new Vector3(wallCenter.x, calibratedY, spawnZ);
 
             var renderer = go.AddComponent<SpriteRenderer>();
             renderer.sprite = sprite;
@@ -191,6 +220,69 @@ namespace CaveGame
 
             go.AddComponent<WallMover>();
             return go;
+        }
+
+        private void CalibrateForCurrentPlayer()
+        {
+            if (m_PlayerPresence == null)
+            {
+                m_PlayerPresence = FindObjectOfType<KinectPlayerPresence>(true);
+            }
+
+            float playerHeight = Mathf.Clamp(fallbackPlayerHeight, 1.2f, 2.2f);
+            m_SessionFloorY = 0f;
+
+            var actor = m_PlayerPresence != null ? m_PlayerPresence.PrimaryActor : null;
+            if (adaptToTrackedPlayer && actor != null)
+            {
+                playerHeight = Mathf.Clamp(actor.height, 1.2f, 2.2f);
+                if (TryGetTrackedFloorY(actor, out float trackedFloor))
+                {
+                    m_SessionFloorY = trackedFloor;
+                }
+            }
+
+            m_SessionScale = 0f;
+            if (m_Sprites != null && m_Sprites.Length > 0 &&
+                WallColliderBuilder.TryGetInteriorHoleBounds(
+                    m_Sprites[0], Mathf.Max(64, gridColumns * 2), alphaThreshold, out var referenceHole) &&
+                referenceHole.size.y > 0.001f)
+            {
+                m_SessionScale = (playerHeight + Mathf.Max(0f, poseClearance)) /
+                                 referenceHole.size.y;
+            }
+
+            if (m_SessionScale <= 0f && m_Sprites != null && m_Sprites.Length > 0)
+            {
+                m_SessionScale = targetWorldHeight /
+                                 Mathf.Max(0.0001f, m_Sprites[0].bounds.size.y);
+            }
+
+            Debug.Log($"[WallSpawner] Kalibriert: Körper={playerHeight:F2} m, " +
+                      $"Spielraum={poseClearance:F2} m, Boden={m_SessionFloorY:F2} m.");
+        }
+
+        private static bool TryGetTrackedFloorY(HTW.CAVE.Kinect.KinectActor actor, out float floorY)
+        {
+            floorY = float.PositiveInfinity;
+            bool found = false;
+
+            var left = actor.GetJoint(JointType.FootLeft);
+            if (left.trackingState != TrackingState.NotTracked)
+            {
+                floorY = Mathf.Min(floorY, left.position.y);
+                found = true;
+            }
+
+            var right = actor.GetJoint(JointType.FootRight);
+            if (right.trackingState != TrackingState.NotTracked)
+            {
+                floorY = Mathf.Min(floorY, right.position.y);
+                found = true;
+            }
+
+            if (!found) floorY = 0f;
+            return found;
         }
 
         private void ReleaseWall(GameObject wall)

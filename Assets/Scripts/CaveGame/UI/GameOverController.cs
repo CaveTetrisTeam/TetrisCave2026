@@ -5,8 +5,9 @@ using HumanTetris;
 namespace CaveGame
 {
     /// <summary>
-    /// Game-Over-Bildschirm: zeigt "Game Over", den erreichten Score und den
-    /// aktuellen Highscore und bietet "Neustart" sowie "Zurück zum Start".
+    /// Game-Over-Bildschirm auf der CAVE-Frontwand: zeigt "Game Over", den
+    /// erreichten Score und den aktuellen Highscore. Neustart und Rückkehr zum
+    /// Menü werden primär über die beiden farbigen Podestknöpfe ausgelöst.
     /// Baut sich per Code auf und ist nur im Zustand <see cref="GameState.GameOver"/> sichtbar.
     /// Die Buttons sind der Maus-/UI-Fallback laut PDF.
     /// </summary>
@@ -19,7 +20,7 @@ namespace CaveGame
         private void Awake()
         {
             CaveUiFactory.EnsureEventSystem();
-            CaveUiFactory.CreateOverlayCanvas(gameObject, 1100);
+            CaveUiFactory.CreateFrontWallCanvas(gameObject, 1100);
             m_Group = gameObject.AddComponent<CanvasGroup>();
 
             // Abdunkelnder Hintergrund.
@@ -65,7 +66,7 @@ namespace CaveGame
             back.onClick.AddListener(OnBackToMenu);
 
             var hint = CaveUiFactory.CreateText(panel.transform, "Hint",
-                "Enter = Neustart   •   Esc = Startbildschirm", 26, FontStyle.Normal,
+                "PODEST:  GRÜN = Neustart   •   BLAU = Menü", 26, FontStyle.Bold,
                 TextAnchor.MiddleCenter, new Color(0.6f, 0.7f, 0.85f));
             CaveUiFactory.SetAnchored(hint.rectTransform,
                 new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),

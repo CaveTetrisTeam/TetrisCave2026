@@ -23,6 +23,8 @@ namespace CaveGame
         }
 
         private static readonly Dictionary<Sprite, BoxData[]> s_Cache = new Dictionary<Sprite, BoxData[]>();
+        private static readonly Dictionary<Sprite, Bounds> s_HoleBounds = new Dictionary<Sprite, Bounds>();
+        private static readonly HashSet<Sprite> s_SpritesWithoutInteriorHole = new HashSet<Sprite>();
 
         /// <summary>
         /// Hängt die generierten BoxCollider an <paramref name="target"/> (lokaler Raum,
@@ -49,6 +51,124 @@ namespace CaveGame
             }
 
             return boxes.Length;
+        }
+
+        /// <summary>
+        /// Findet die größte transparente, vollständig von Wand umschlossene Fläche
+        /// im Sprite. Transparenz am äußeren Bildrand wird bewusst ignoriert. Die
+        /// zurückgegebenen Grenzen liegen im lokalen Sprite-Raum und dienen der
+        /// Größen-/Bodenkalibrierung der Körperöffnung.
+        /// </summary>
+        public static bool TryGetInteriorHoleBounds(Sprite sprite, int gridColumns,
+                                                    float alphaThreshold, out Bounds bounds)
+        {
+            if (sprite == null)
+            {
+                bounds = default;
+                return false;
+            }
+
+            if (s_HoleBounds.TryGetValue(sprite, out bounds)) return true;
+            if (s_SpritesWithoutInteriorHole.Contains(sprite)) return false;
+
+            var pixels = ReadPixels(sprite.texture, out int texW, out int texH);
+            if (pixels == null)
+            {
+                bounds = default;
+                return false;
+            }
+
+            int gridX = Mathf.Max(16, gridColumns);
+            int gridY = Mathf.Max(8, Mathf.RoundToInt(gridX *
+                sprite.bounds.size.y / Mathf.Max(0.0001f, sprite.bounds.size.x)));
+            var open = new bool[gridX, gridY];
+            var visited = new bool[gridX, gridY];
+            var rect = sprite.rect;
+            byte threshold = (byte)Mathf.RoundToInt(Mathf.Clamp01(alphaThreshold) * 255f);
+
+            for (int y = 0; y < gridY; y++)
+            for (int x = 0; x < gridX; x++)
+            {
+                int px = Mathf.Clamp(
+                    Mathf.FloorToInt(rect.x + (x + 0.5f) / gridX * rect.width), 0, texW - 1);
+                int py = Mathf.Clamp(
+                    Mathf.FloorToInt(rect.y + (y + 0.5f) / gridY * rect.height), 0, texH - 1);
+                open[x, y] = pixels[py * texW + px].a < threshold;
+            }
+
+            int bestCount = 0;
+            int bestMinX = 0, bestMaxX = 0, bestMinY = 0, bestMaxY = 0;
+            var queue = new Queue<Vector2Int>();
+            var directions = new[]
+            {
+                new Vector2Int(1, 0), new Vector2Int(-1, 0),
+                new Vector2Int(0, 1), new Vector2Int(0, -1)
+            };
+
+            for (int startY = 0; startY < gridY; startY++)
+            for (int startX = 0; startX < gridX; startX++)
+            {
+                if (!open[startX, startY] || visited[startX, startY]) continue;
+
+                int count = 0;
+                int minX = startX, maxX = startX, minY = startY, maxY = startY;
+                bool touchesImageEdge = false;
+                visited[startX, startY] = true;
+                queue.Enqueue(new Vector2Int(startX, startY));
+
+                while (queue.Count > 0)
+                {
+                    var cell = queue.Dequeue();
+                    count++;
+                    minX = Mathf.Min(minX, cell.x);
+                    maxX = Mathf.Max(maxX, cell.x);
+                    minY = Mathf.Min(minY, cell.y);
+                    maxY = Mathf.Max(maxY, cell.y);
+                    touchesImageEdge |= cell.x == 0 || cell.x == gridX - 1 ||
+                                        cell.y == 0 || cell.y == gridY - 1;
+
+                    foreach (var direction in directions)
+                    {
+                        int nextX = cell.x + direction.x;
+                        int nextY = cell.y + direction.y;
+                        if (nextX < 0 || nextX >= gridX || nextY < 0 || nextY >= gridY ||
+                            visited[nextX, nextY] || !open[nextX, nextY]) continue;
+
+                        visited[nextX, nextY] = true;
+                        queue.Enqueue(new Vector2Int(nextX, nextY));
+                    }
+                }
+
+                if (!touchesImageEdge && count > bestCount)
+                {
+                    bestCount = count;
+                    bestMinX = minX;
+                    bestMaxX = maxX;
+                    bestMinY = minY;
+                    bestMaxY = maxY;
+                }
+            }
+
+            if (bestCount == 0)
+            {
+                s_SpritesWithoutInteriorHole.Add(sprite);
+                bounds = default;
+                return false;
+            }
+
+            float cellWidth = sprite.bounds.size.x / gridX;
+            float cellHeight = sprite.bounds.size.y / gridY;
+            float minLocalX = sprite.bounds.min.x + bestMinX * cellWidth;
+            float maxLocalX = sprite.bounds.min.x + (bestMaxX + 1) * cellWidth;
+            float minLocalY = sprite.bounds.min.y + bestMinY * cellHeight;
+            float maxLocalY = sprite.bounds.min.y + (bestMaxY + 1) * cellHeight;
+
+            bounds = new Bounds(
+                new Vector3((minLocalX + maxLocalX) * 0.5f,
+                            (minLocalY + maxLocalY) * 0.5f, 0f),
+                new Vector3(maxLocalX - minLocalX, maxLocalY - minLocalY, 0f));
+            s_HoleBounds[sprite] = bounds;
+            return true;
         }
 
         private static BoxData[] GetOrComputeBoxes(Sprite sprite, int gridColumns,

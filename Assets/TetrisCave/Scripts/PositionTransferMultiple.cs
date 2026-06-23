@@ -96,6 +96,9 @@ public sealed class PositionTransferMultiple : MonoBehaviour
 
     [Tooltip("Blendet die rohe KinectActor-Prefab-Visualisierung aus, damit nur der gespiegelte Corpus sichtbar ist.")]
     public bool hideSourceActorRenderers = true;
+    [Tooltip("Nur für Debugging: zeigt den großen Corpus-Avatar im Raum. Im Spiel bleibt er unsichtbar; " +
+             "die Pose erscheint ausschließlich in der HUD-Vorschau unten rechts.")]
+    public bool showWorldAvatar = false;
 
     private KinectTracker m_Tracker;
 
@@ -238,6 +241,14 @@ public sealed class PositionTransferMultiple : MonoBehaviour
 
         bodyPart.name = partName;
 
+        // Die Körperteile bleiben als unsichtbare Tracking-/Kollisionspunkte aktiv.
+        // Die einzige sichtbare Darstellung der Pose zeichnet SkeletonPreviewGraphic
+        // unten rechts aus genau diesen Transform-Positionen.
+        foreach (var renderer in bodyPart.GetComponentsInChildren<Renderer>(true))
+        {
+            renderer.enabled = showWorldAvatar;
+        }
+
         bool hasUsableCollider = false;
         foreach (var collider in bodyPart.GetComponents<Collider>())
         {
@@ -303,7 +314,7 @@ public sealed class PositionTransferMultiple : MonoBehaviour
 
         bool tracked = from.trackingState != TrackingState.NotTracked &&
                        to.trackingState != TrackingState.NotTracked;
-        line.enabled = tracked;
+        line.enabled = showWorldAvatar && tracked;
         if (!tracked) return;
 
         line.SetPosition(0, MirrorJoint(from.position));
