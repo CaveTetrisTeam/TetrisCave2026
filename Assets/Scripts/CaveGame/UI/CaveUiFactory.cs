@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
+using HTW.CAVE;
 
 namespace CaveGame
 {
@@ -63,6 +64,40 @@ namespace CaveGame
             scaler.matchWidthOrHeight = 0.5f;
 
             host.AddComponent<GraphicRaycaster>();
+            return canvas;
+        }
+
+        /// <summary>
+        /// Erzeugt ein World-Space-Canvas unmittelbar vor der physischen CAVE-
+        /// Frontwand. ScreenSpaceOverlay landet nur im Desktop-GameView und wird
+        /// von den virtuellen Projektorkameras nicht in den Raum gerendert.
+        /// </summary>
+        public static Canvas CreateFrontWallCanvas(GameObject host, int sortingOrder)
+        {
+            var canvas = host.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.WorldSpace;
+            canvas.overrideSorting = true;
+            canvas.sortingOrder = sortingOrder;
+
+            var rect = host.GetComponent<RectTransform>();
+            rect.sizeDelta = new Vector2(1920f, 1080f);
+            rect.pivot = new Vector2(0.5f, 0.5f);
+
+            var environment = Object.FindObjectOfType<VirtualEnvironment>(true);
+            Vector3 dimensions = environment != null
+                ? environment.dimensions
+                : new Vector3(3f, 2.45f, 3f);
+
+            if (environment != null)
+            {
+                rect.SetParent(environment.transform, false);
+            }
+
+            // Zwei Zentimeter innerhalb der Frontfläche verhindern Z-Fighting.
+            rect.localPosition = new Vector3(0f, dimensions.y * 0.5f, dimensions.z * 0.5f - 0.02f);
+            rect.localRotation = Quaternion.identity;
+            rect.localScale = Vector3.one * (dimensions.x / 1920f);
+
             return canvas;
         }
 

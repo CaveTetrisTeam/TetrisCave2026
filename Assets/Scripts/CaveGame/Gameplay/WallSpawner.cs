@@ -178,6 +178,8 @@ namespace CaveGame
             var body = go.AddComponent<Rigidbody>();
             body.isKinematic = true;
             body.useGravity = false;
+            body.interpolation = RigidbodyInterpolation.Interpolate;
+            body.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
 
             go.AddComponent<Wall>();
             var hitZone = go.AddComponent<WallHitZone>();

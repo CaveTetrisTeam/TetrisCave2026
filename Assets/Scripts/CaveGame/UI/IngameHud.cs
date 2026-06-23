@@ -4,7 +4,8 @@ using UnityEngine.UI;
 namespace CaveGame
 {
     /// <summary>
-    /// In-Game-HUD: zeigt Leben (oben links) und aktuellen Score (oben rechts).
+    /// In-Game-HUD auf der physischen CAVE-Frontwand: zeigt Leben (oben links),
+    /// Score (oben rechts) und die Corpus-Tracking-Vorschau (unten rechts).
     /// Baut sich komplett per Code auf und ist nur im Zustand
     /// <see cref="GameState.Playing"/> sichtbar.
     /// </summary>
@@ -19,21 +20,37 @@ namespace CaveGame
         private void Awake()
         {
             CaveUiFactory.EnsureEventSystem();
-            CaveUiFactory.CreateOverlayCanvas(gameObject, 900);
+            CaveUiFactory.CreateFrontWallCanvas(gameObject, 900);
             m_Group = gameObject.AddComponent<CanvasGroup>();
 
-            var lives = CaveUiFactory.CreateText(transform, "Lives", "", 48, FontStyle.Bold,
-                TextAnchor.UpperLeft, new Color(1f, 0.45f, 0.45f));
-            CaveUiFactory.SetAnchored(lives.rectTransform,
+            var livesPlate = CaveUiFactory.CreateImage(transform, "Lives Plate",
+                new Color(0.015f, 0.035f, 0.07f, 0.88f));
+            CaveUiFactory.SetAnchored(livesPlate.rectTransform,
                 new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f),
-                new Vector2(40f, -30f), new Vector2(600f, 80f));
+                new Vector2(34f, -26f), new Vector2(560f, 92f));
+            livesPlate.raycastTarget = false;
+
+            var lives = CaveUiFactory.CreateText(livesPlate.transform, "Lives", "", 52, FontStyle.Bold,
+                TextAnchor.UpperLeft, new Color(1f, 0.45f, 0.45f));
+            CaveUiFactory.Stretch(lives.rectTransform);
+            lives.rectTransform.offsetMin = new Vector2(22f, 0f);
+            lives.rectTransform.offsetMax = new Vector2(-12f, 0f);
+            lives.gameObject.AddComponent<Outline>().effectColor = new Color(0f, 0f, 0f, 0.85f);
             m_LivesText = lives;
 
-            var score = CaveUiFactory.CreateText(transform, "Score", "", 48, FontStyle.Bold,
-                TextAnchor.UpperRight, new Color(0.92f, 1f, 0.6f));
-            CaveUiFactory.SetAnchored(score.rectTransform,
+            var scorePlate = CaveUiFactory.CreateImage(transform, "Score Plate",
+                new Color(0.015f, 0.035f, 0.07f, 0.88f));
+            CaveUiFactory.SetAnchored(scorePlate.rectTransform,
                 new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(1f, 1f),
-                new Vector2(-40f, -30f), new Vector2(600f, 80f));
+                new Vector2(-34f, -26f), new Vector2(560f, 92f));
+            scorePlate.raycastTarget = false;
+
+            var score = CaveUiFactory.CreateText(scorePlate.transform, "Score", "", 52, FontStyle.Bold,
+                TextAnchor.UpperRight, new Color(0.92f, 1f, 0.6f));
+            CaveUiFactory.Stretch(score.rectTransform);
+            score.rectTransform.offsetMin = new Vector2(12f, 0f);
+            score.rectTransform.offsetMax = new Vector2(-22f, 0f);
+            score.gameObject.AddComponent<Outline>().effectColor = new Color(0f, 0f, 0f, 0.85f);
             m_ScoreText = score;
 
             BuildSkeletonPreview();

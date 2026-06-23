@@ -1,4 +1,5 @@
 using UnityEngine;
+using HTW.CAVE;
 
 namespace CaveGame
 {
@@ -18,6 +19,7 @@ namespace CaveGame
         {
             EnsureGameManager();
             EnsureKinect();
+            ConfigureMonoCaveProjection();
             EnsureWallSpawner();
             EnsureUi();
             RemoveLegacyStartButtons();
@@ -53,13 +55,38 @@ namespace CaveGame
 
         private static void EnsureWallSpawner()
         {
-            if (Object.FindObjectOfType<WallSpawner>(true) != null)
+            var existing = Object.FindObjectsOfType<WallSpawner>(true);
+            if (existing.Length > 0)
             {
+                // Bei zusammengeführten Szenen darf nur ein Spawner übrig bleiben.
+                for (int i = 1; i < existing.Length; i++)
+                {
+                    Object.Destroy(existing[i].gameObject);
+                }
                 return;
             }
 
             var go = new GameObject("Wall Spawner");
             go.AddComponent<WallSpawner>();
+        }
+
+        /// <summary>
+        /// Beide Frontprojektoren bleiben aktiv, rendern aber denselben Mono-
+        /// Blickpunkt. Damit werden die bisherigen links/rechts versetzten
+        /// Stereo-Silhouetten deckungsgleich statt als zwei Wände wahrgenommen.
+        /// </summary>
+        private static void ConfigureMonoCaveProjection()
+        {
+            var environment = Object.FindObjectOfType<VirtualEnvironment>(true);
+            if (environment != null)
+            {
+                environment.eyeSeperation = 0f;
+            }
+
+            foreach (var virtualCamera in Object.FindObjectsOfType<VirtualCamera>(true))
+            {
+                virtualCamera.stereoTarget = VirtualEyes.StereoTarget.Mono;
+            }
         }
 
         private static void EnsureUi()
