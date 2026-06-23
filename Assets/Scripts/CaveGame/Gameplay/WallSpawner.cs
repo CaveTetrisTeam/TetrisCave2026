@@ -56,6 +56,8 @@ namespace CaveGame
         public float alphaThreshold = 0.5f;
         [Tooltip("Welt-Tiefe der Wand-Collider (Z).")]
         public float colliderThickness = 0.3f;
+        [Tooltip("Zusätzliche kollisionsfreie Toleranz rund um die sichtbare Körperöffnung (Meter).")]
+        public float openingHitboxPadding = 0.08f;
         [Tooltip("Layer der Avatar-Körperteile. Leer = automatisch Layer 'Player'.")]
         public LayerMask playerLayers;
 
@@ -216,7 +218,9 @@ namespace CaveGame
 
             // Collider aus dem Alphakanal erzeugen (lokale Dicke = Weltdicke / Skalierung).
             float localThickness = colliderThickness / Mathf.Max(0.0001f, scale);
-            WallColliderBuilder.Build(go, sprite, gridColumns, alphaThreshold, localThickness, true);
+            float localOpeningPadding = openingHitboxPadding / Mathf.Max(0.0001f, scale);
+            WallColliderBuilder.Build(go, sprite, gridColumns, alphaThreshold,
+                                      localThickness, true, localOpeningPadding);
 
             go.AddComponent<WallMover>();
             return go;

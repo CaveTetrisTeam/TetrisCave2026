@@ -32,7 +32,8 @@ namespace CaveGame
         /// </summary>
         /// <returns>Anzahl erzeugter Collider.</returns>
         public static int Build(GameObject target, Sprite sprite, int gridColumns,
-                                float alphaThreshold, float localThickness, bool isTrigger)
+                                float alphaThreshold, float localThickness, bool isTrigger,
+                                float localOpeningPadding = 0f)
         {
             if (target == null || sprite == null)
             {
@@ -40,7 +41,8 @@ namespace CaveGame
             }
 
             var boxes = GetOrComputeBoxes(sprite, Mathf.Max(4, gridColumns),
-                                          Mathf.Clamp01(alphaThreshold), localThickness);
+                                          Mathf.Clamp01(alphaThreshold), localThickness,
+                                          Mathf.Max(0f, localOpeningPadding));
 
             foreach (var box in boxes)
             {
@@ -172,20 +174,23 @@ namespace CaveGame
         }
 
         private static BoxData[] GetOrComputeBoxes(Sprite sprite, int gridColumns,
-                                                   float alphaThreshold, float localThickness)
+                                                   float alphaThreshold, float localThickness,
+                                                   float localOpeningPadding)
         {
             if (s_Cache.TryGetValue(sprite, out var cached))
             {
                 return cached;
             }
 
-            var boxes = ComputeBoxes(sprite, gridColumns, alphaThreshold, localThickness);
+            var boxes = ComputeBoxes(sprite, gridColumns, alphaThreshold, localThickness,
+                                     localOpeningPadding);
             s_Cache[sprite] = boxes;
             return boxes;
         }
 
         private static BoxData[] ComputeBoxes(Sprite sprite, int gridColumns,
-                                              float alphaThreshold, float localThickness)
+                                              float alphaThreshold, float localThickness,
+                                              float localOpeningPadding)
         {
             // Lokale (unskalierten) Maße des Sprites, zentriert um (0,0).
             float worldW = sprite.bounds.size.x;
@@ -216,6 +221,15 @@ namespace CaveGame
 
                     solid[cx, cy] = pixels[py * texW + px].a >= threshold;
                 }
+            }
+
+            // Die sichtbare Öffnung bleibt unverändert, ihre unsichtbare Hitbox
+            // wird aber rundum erweitert. Nur die größte transparente Fläche,
+            // die NICHT den Bildrand berührt, zählt als Körperöffnung; dadurch
+            // werden Außenränder der Wand nicht versehentlich kollisionsfrei.
+            if (localOpeningPadding > 0f)
+            {
+                ExpandInteriorOpening(solid, worldW, worldH, localOpeningPadding);
             }
 
             // 2) Pro Zeile zusammenhängende Wand-Zellen zu einer Box zusammenfassen.
@@ -256,6 +270,82 @@ namespace CaveGame
             }
 
             return result.ToArray();
+        }
+
+        private static void ExpandInteriorOpening(bool[,] solid, float worldWidth,
+                                                  float worldHeight, float localPadding)
+        {
+            int gridX = solid.GetLength(0);
+            int gridY = solid.GetLength(1);
+            var visited = new bool[gridX, gridY];
+            var queue = new Queue<Vector2Int>();
+            var directions = new[]
+            {
+                new Vector2Int(1, 0), new Vector2Int(-1, 0),
+                new Vector2Int(0, 1), new Vector2Int(0, -1)
+            };
+            List<Vector2Int> largestInteriorOpening = null;
+
+            for (int startY = 0; startY < gridY; startY++)
+            for (int startX = 0; startX < gridX; startX++)
+            {
+                if (solid[startX, startY] || visited[startX, startY]) continue;
+
+                var component = new List<Vector2Int>();
+                bool touchesImageEdge = false;
+                visited[startX, startY] = true;
+                queue.Enqueue(new Vector2Int(startX, startY));
+
+                while (queue.Count > 0)
+                {
+                    var cell = queue.Dequeue();
+                    component.Add(cell);
+                    touchesImageEdge |= cell.x == 0 || cell.x == gridX - 1 ||
+                                        cell.y == 0 || cell.y == gridY - 1;
+
+                    foreach (var direction in directions)
+                    {
+                        int nextX = cell.x + direction.x;
+                        int nextY = cell.y + direction.y;
+                        if (nextX < 0 || nextX >= gridX || nextY < 0 || nextY >= gridY ||
+                            visited[nextX, nextY] || solid[nextX, nextY]) continue;
+
+                        visited[nextX, nextY] = true;
+                        queue.Enqueue(new Vector2Int(nextX, nextY));
+                    }
+                }
+
+                if (!touchesImageEdge &&
+                    (largestInteriorOpening == null || component.Count > largestInteriorOpening.Count))
+                {
+                    largestInteriorOpening = component;
+                }
+            }
+
+            if (largestInteriorOpening == null) return;
+
+            float cellWidth = worldWidth / gridX;
+            float cellHeight = worldHeight / gridY;
+            int paddingX = Mathf.Max(1, Mathf.CeilToInt(localPadding / cellWidth));
+            int paddingY = Mathf.Max(1, Mathf.CeilToInt(localPadding / cellHeight));
+
+            foreach (var source in largestInteriorOpening)
+            {
+                for (int dy = -paddingY; dy <= paddingY; dy++)
+                for (int dx = -paddingX; dx <= paddingX; dx++)
+                {
+                    float normalizedX = dx / (float)paddingX;
+                    float normalizedY = dy / (float)paddingY;
+                    if (normalizedX * normalizedX + normalizedY * normalizedY > 1f) continue;
+
+                    int x = source.x + dx;
+                    int y = source.y + dy;
+                    if (x >= 0 && x < gridX && y >= 0 && y < gridY)
+                    {
+                        solid[x, y] = false;
+                    }
+                }
+            }
         }
 
         /// <summary>
