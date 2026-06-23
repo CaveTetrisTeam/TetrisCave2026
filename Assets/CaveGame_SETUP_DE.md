@@ -3,8 +3,9 @@
 Diese Demo setzt die Aufgabe aus `Unity Kinect Cave Game.pdf` um: Der Spieler steht still in der
 Höhle, **Wände mit posenförmiger Öffnung** kommen auf ihn zu. Passt sein per Kinect getracktes Skelett
 durch die Öffnung → **+100 Punkte**; berührt ein Körperteil die Wand → **ein Leben weg** (Start: 3).
-Bei 0 Leben → Game Over + Highscore. Der **Startbildschirm** bleibt erhalten und besitzt einen
-**physischen 3D-Startknopf**, den man mit der echten Hand drückt – **ohne sichtbaren Cursor**.
+Bei 0 Leben → Game Over + Highscore. Der **Startbildschirm** bleibt erhalten und besitzt genau einen
+beschrifteten Startknopf. Dieser funktioniert per Maus und wie ein physischer Kinect-Knopf mit der
+echten Hand – **ohne sichtbaren Cursor**.
 
 Unity-Version: **2022.3.59f1** (Built-in Render Pipeline). CAVE-Paket `de.htw-berlin.cave` ist bereits
 eingebunden.
@@ -52,10 +53,10 @@ Alles ist idempotent und greift nur, wenn nötig. Manuell erneut auslösbar übe
 Assets/Scripts/CaveGame/
   Core/    GameState.cs, GameManager.cs, GameBootstrapper.cs
   Kinect/  KinectPlayerPresence.cs, KinectHandInteractor.cs
-  Button/  KinectPhysicalButton.cs
+  Button/  KinectUiStartButton.cs, KinectPhysicalButton.cs (Legacy)
   Gameplay/WallColliderBuilder.cs, Wall.cs, WallMover.cs, WallHitZone.cs,
            WallSpawner.cs, PlayerBodyPart.cs
-  UI/      CaveUiFactory.cs, IngameHud.cs, GameOverController.cs
+  UI/      CaveUiFactory.cs, IngameHud.cs, SkeletonPreviewGraphic.cs, GameOverController.cs
 
 Assets/Editor/
   CaveGameSetup.cs   (Auto-Einrichtung: Layer, Texturen, Spielszene, Build Settings)
@@ -80,8 +81,8 @@ entfernt werden, wenn er nicht gebraucht wird.
 
 `GameBootstrapper` erzeugt beim Szenenstart automatisch:
 `Game Manager`, `Kinect Player Presence`, `Kinect Hand Interactor`, `Wall Spawner`,
-`Ingame HUD`, `Game Over UI` und – falls keiner in der Szene ist – einen `Kinect Physical Start Button`
-vor der Hauptkamera. Der Startbildschirm erscheint wie bisher automatisch.
+`Ingame HUD` und `Game Over UI`. Der Startbildschirm erscheint wie bisher automatisch. Alte
+CAVE-Sample-Buttons werden entfernt, damit kein leerer, funktionsloser Knopf stehen bleibt.
 
 Du musst also **nur** dafür sorgen, dass die Szene folgendes enthält (siehe Schritt 3):
 das **CAVE-Rig** (Kinect) und den **Avatar-Tracker** (`PositionTransferMultiple`).
@@ -108,8 +109,8 @@ das **CAVE-Rig** (Kinect) und den **Avatar-Tracker** (`PositionTransferMultiple`
    - `handPrefab`, `headPrefab`, `bodyPrefab` (z. B. die CAVE-Sample-Prefabs `Hand` / `BodyParts`),
    - optional `particlePrefab` und `collisionSound`.
 4. **Boden/Höhle** (optional, rein visuell): z. B. die vorhandenen Modelle `bodenT2/bodenT3` platzieren.
-5. **Hauptkamera** muss mit Tag `MainCamera` versehen sein (für die Auto-Platzierung des Knopfs).
-   Im CAVE-Rig ist i. d. R. bereits eine Kamera vorhanden.
+5. Für die Handprojektion wird automatisch zuerst `Virtual Camera Front L`, danach `Front R` und
+   schließlich die `MainCamera` verwendet.
 
 Beim Start ist die **Szenen-Hierarchie** dann etwa:
 
@@ -123,7 +124,6 @@ Kinect Player Presence
 Kinect Hand Interactor → "Interaction Point (invisible)"
 Wall Spawner → Wall_… (gespawnte Wände)
 Ingame HUD / Game Over UI / HumanTetris Start Menu / EventSystem
-Kinect Physical Start Button (Housing + Cap)
 ```
 
 ---
@@ -192,24 +192,25 @@ Schwierigkeit: `baseSpeed`, `maxSpeed`, `speedGrowthPerSecond`, `baseInterval`, 
 
 ---
 
-## 7. Physischer Startknopf
+## 7. Einheitlicher Kinect-Startknopf
 
-Der Knopf entsteht automatisch vor der Kamera. Für feste Position/Optik: leeres GameObject in die Szene,
-`KinectPhysicalButton` anhängen, an die gewünschte Stelle (in Reichweite des Spielers) setzen – die
-lokale **+Z-Achse muss zum Spieler zeigen** (Druckrichtung = lokal −Z).
+Der beschriftete UI-Knopf **„Spiel starten"** ist jetzt der einzige Startknopf. Sein normaler
+`onClick`-Ablauf wird auch durch `KinectUiStartButton` ausgelöst; Maus und Kinect starten somit exakt
+dieselbe Funktion. Die Hand bleibt unsichtbar. Sie muss über dem Knopf liegen, mindestens kurz dort
+verweilen und gegenüber der Schulter weit genug nach vorne ausgestreckt werden. Der Knopf leuchtet und
+bewegt sich beim Drücken sichtbar nach unten.
 
-Wichtige Parameter:
-- `maxPressDepth` (0.05) / `activationDepth` (0.035): sichtbare Eindrücktiefe bzw. Auslöse-Tiefe.
-- `touchDistance` (0.06): ab wann der Knopf bei Berührung visuell reagiert (Leuchten).
-- `lateralRadius` (0.14) + `minContactTime` (0.10) + `cooldown` (1.5): Schutz gegen versehentliches
-  Auslösen beim Vorbeiwischen.
-- `requirePlayerTracking` (an): Knopf löst nur aus, wenn eine Person zuverlässig getrackt wird.
-  Zum Testen ohne Kinect ausschalten.
-- `clickSound`: eigener Klick-Sound; ohne Zuweisung wird ein kurzer Klick prozedural erzeugt.
-- `cap`: eigene Kappe/Optik zuweisen; sonst wird Gehäuse + Kappe automatisch erzeugt.
+Wichtige Parameter in `KinectUiStartButton`:
+- `touchReach` / `activationReach` (0.04 / 0.18 m): Beginn der Rückmeldung und Auslösetiefe.
+- `minimumContactTime` (0.12 s) + `cooldown` (1.25 s): Schutz gegen Vorbeiwischen/Doppelauslösung.
+- `requireReliableTracking`: Kinect-Auslösung nur bei stabil erkanntem Spieler.
 
-Die Handposition kommt aus dem **`Kinect Hand Interactor`** (unsichtbar). Bei Bedarf justieren:
-`calibrationOffset`, `handPreference` (Either/Left/Right), `positionSmoothingTime`.
+Die Maus bleibt als Entwicklungs-Fallback aktiv. Die Handposition kommt aus dem
+**`Kinect Hand Interactor`**; `calibrationOffset`, `handPreference` und `positionSmoothingTime` können
+weiter zur Kalibrierung verwendet werden.
+
+Während `Playing` zeigt das Ingame-HUD unten rechts zusätzlich **Corpus in Speculo**. Die Vorschau
+zeichnet dieselben Gelenke wie `PositionTransferMultiple`, also exakt die Pose des Kollisionsavatars.
 
 ---
 
@@ -231,15 +232,15 @@ Startbildschirm sowie im Game-Over-Screen angezeigt.
 - Mit **Maus** auf „Spiel starten" klicken **oder** `Enter`/`Leertaste`.
 - In `WaitingForPlayerTracking` startet ohne getrackte Person nichts → mit `Enter`/`Leertaste`
   überspringen (Fallback). Tipp: am `GameManager` `requirePlayerTracking` aus, dann startet es direkt.
-- Wände fliegen heran, Score zählt hoch, HUD zeigt Leben/Punkte. Treffer testest du, indem du den
+- Wände fliegen heran, Score zählt hoch, HUD zeigt Leben/Punkte und unten rechts die Live-Pose. Treffer testest du, indem du den
   Avatar/ein Körperteil in eine Wand bewegst (oder im Editor einen Collider mit Marker `PlayerBodyPart`
   durch eine Wand schiebst). Bei 0 Leben → Game Over (Neustart = `Enter`, Zurück = `Esc`).
 - Ohne Wand-Grafiken erscheint automatisch eine **Platzhalter-Wand** mit rechteckiger Öffnung.
 
 **Mit Kinect (CAVE):**
 - Person betritt das Trackingfeld → `WaitingForPlayerTracking` wechselt zu `Playing`.
-- Hand zum 3D-Knopf führen und „drücken": Knopf leuchtet bei Berührung, bewegt sich sichtbar nach
-  hinten, löst ab der Drucktiefe mit Klick-Sound aus – **kein Cursor** sichtbar.
+- Skelett-Hand über „Spiel starten" führen und nach vorne ausstrecken: Knopf leuchtet, bewegt sich
+  sichtbar und löst ab der Drucktiefe aus – **kein Cursor** und kein zweiter leerer Button sichtbar.
 - Durch die Öffnung passen = Punkte; Wand berühren = Leben verlieren.
 
 ---
@@ -257,7 +258,7 @@ Startbildschirm sowie im Game-Over-Screen angezeigt.
 ## 11. Abgleich mit der Aufgabenliste (PDF)
 
 1. Projektstruktur ✓ · 2. C#-Skripte ✓ · 3. Szenen-Hierarchie ✓ (Abschnitt 3) ·
-4. Startbildschirm-Setup ✓ (bleibt erhalten) · 5. Physischer Knopf ohne Cursor ✓ ·
+4. Startbildschirm-Setup ✓ (bleibt erhalten) · 5. Physischer Kinect-Druck ohne Cursor ✓ ·
 6. Adaption der Button-Interaktion aus dem Referenzprojekt ✓ (`ObjectToggleButton`-Prinzip) ·
 7. Collider/Rigidbody-Setup ✓ (Abschnitt 4) · 8. UI Start/Spiel/Game Over ✓ ·
 9. Score- & Highscore-System ✓ (`HumanTetrisHighscore`) · 10. Wand-Spawn-Logik ✓ ·

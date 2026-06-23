@@ -459,6 +459,10 @@ namespace HumanTetris
             Stretch(buttonText.rectTransform);
             MoveRect(buttonText.rectTransform, 0f, -4f);
 
+            // Derselbe sichtbare Button verarbeitet zusätzlich den unsichtbaren
+            // Kinect-Handdruck. Dadurch gibt es keinen zweiten, leeren 3D-Knopf mehr.
+            button.gameObject.AddComponent<CaveGame.KinectUiStartButton>();
+
             return button;
         }
 

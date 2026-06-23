@@ -20,7 +20,7 @@ namespace CaveGame
             EnsureKinect();
             EnsureWallSpawner();
             EnsureUi();
-            EnsurePhysicalButton();
+            RemoveLegacyStartButtons();
         }
 
         private static void EnsureGameManager()
@@ -75,30 +75,29 @@ namespace CaveGame
             }
         }
 
-        private static void EnsurePhysicalButton()
+        /// <summary>
+        /// Der Startbildschirm besitzt jetzt genau einen Button: den beschrifteten
+        /// UI-Button, der Maus und Kinect-Handdruck gemeinsam verarbeitet. Die alten
+        /// CAVE-Sample-Buttons sowie frühere, separat erzeugte 3D-Startknöpfe würden
+        /// sonst als leere, funktionslose Knöpfe in der Szene stehen bleiben.
+        /// </summary>
+        private static void RemoveLegacyStartButtons()
         {
-            if (Object.FindObjectOfType<KinectPhysicalButton>(true) != null)
+            foreach (var physicalButton in Object.FindObjectsOfType<KinectPhysicalButton>(true))
             {
-                return;
+                if (physicalButton != null)
+                {
+                    Object.Destroy(physicalButton.gameObject);
+                }
             }
 
-            var go = new GameObject("Kinect Physical Start Button");
-
-            // Vor der Hauptkamera platzieren; Druckfläche (lokal +Z) zeigt zum Spieler/zur Kamera.
-            var cam = Camera.main;
-            if (cam != null)
+            foreach (var behaviour in Object.FindObjectsOfType<MonoBehaviour>(true))
             {
-                go.transform.position = cam.transform.position + cam.transform.forward * 1.5f;
-                go.transform.rotation = Quaternion.LookRotation(
-                    (cam.transform.position - go.transform.position).normalized, Vector3.up);
+                if (behaviour != null && behaviour.GetType().Name == "ObjectToggleButton")
+                {
+                    Object.Destroy(behaviour.gameObject);
+                }
             }
-            else
-            {
-                go.transform.position = new Vector3(0f, 1.2f, 1.5f);
-                go.transform.rotation = Quaternion.LookRotation(Vector3.back, Vector3.up);
-            }
-
-            go.AddComponent<KinectPhysicalButton>();
         }
     }
 }

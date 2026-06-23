@@ -15,6 +15,7 @@ namespace CaveGame
     public sealed class KinectHandInteractor : MonoBehaviour
     {
         public enum HandPreference { Either, Left, Right }
+        public enum TrackedHand { None, Left, Right }
 
         [Tooltip("Welche Hand steuert den Interaktionspunkt? 'Either' nimmt die am weitesten nach vorne gestreckte.")]
         public HandPreference handPreference = HandPreference.Either;
@@ -27,6 +28,8 @@ namespace CaveGame
 
         /// <summary>Liefert true, wenn aktuell eine Hand getrackt ist.</summary>
         public bool HasHand { get; private set; }
+        /// <summary>Welche Hand aktuell den Interaktionspunkt steuert.</summary>
+        public TrackedHand ActiveHand { get; private set; }
         /// <summary>Geglättete Weltposition der aktiven Hand.</summary>
         public Vector3 HandPosition { get; private set; }
         /// <summary>Der unsichtbare Interaktionspunkt (Transform mit Collider).</summary>
@@ -88,6 +91,7 @@ namespace CaveGame
             else
             {
                 HasHand = false;
+                ActiveHand = TrackedHand.None;
                 m_HasSmoothed = false;
                 InteractionPoint.position = ParkedPosition;
             }
@@ -163,16 +167,27 @@ namespace CaveGame
             switch (handPreference)
             {
                 case HandPreference.Left:
+                    ActiveHand = leftTracked ? TrackedHand.Left : TrackedHand.Right;
                     return leftTracked ? left : right;
                 case HandPreference.Right:
+                    ActiveHand = rightTracked ? TrackedHand.Right : TrackedHand.Left;
                     return rightTracked ? right : left;
                 default:
                     if (leftTracked && rightTracked)
                     {
                         // Die am weitesten nach vorne (Kamera-Blickrichtung) gestreckte Hand greift.
                         var forward = Camera.main != null ? Camera.main.transform.forward : Vector3.forward;
-                        return Vector3.Dot(right, forward) >= Vector3.Dot(left, forward) ? right : left;
+                        if (Vector3.Dot(right, forward) >= Vector3.Dot(left, forward))
+                        {
+                            ActiveHand = TrackedHand.Right;
+                            return right;
+                        }
+
+                        ActiveHand = TrackedHand.Left;
+                        return left;
                     }
+
+                    ActiveHand = rightTracked ? TrackedHand.Right : TrackedHand.Left;
                     return rightTracked ? right : left;
             }
         }

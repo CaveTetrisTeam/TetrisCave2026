@@ -26,7 +26,7 @@ namespace CaveGame.EditorTools
         private const string WallTextureFolder = "Assets/TetrisCave/Walls/Resources/Walls";
 
         private const string SetupVersionKey = "CaveGame.SetupVersion";
-        private const int SetupVersion = 1;
+        private const int SetupVersion = 2;
 
         // Komponenten, die in der Spielszene nichts zu suchen haben:
         //  - CAVE-Beispiel-Demos (Würfel/Flammen/Sample-Buttons/Distanztest)
@@ -219,6 +219,7 @@ namespace CaveGame.EditorTools
         private static int StripSampleObjects(Scene scene)
         {
             var toRemove = new List<MonoBehaviour>();
+            var buttonObjects = new HashSet<GameObject>();
 
             foreach (var root in scene.GetRootGameObjects())
             {
@@ -226,7 +227,16 @@ namespace CaveGame.EditorTools
                 {
                     if (comp != null && RemovableComponentNames.Contains(comp.GetType().Name))
                     {
-                        toRemove.Add(comp);
+                        // Sample-Buttons komplett entfernen. Nur die Komponente zu
+                        // löschen ließ bisher sichtbare, aber funktionslose Knöpfe zurück.
+                        if (comp.GetType().Name == "ObjectToggleButton")
+                        {
+                            buttonObjects.Add(comp.gameObject);
+                        }
+                        else
+                        {
+                            toRemove.Add(comp);
+                        }
                     }
                 }
             }
@@ -237,6 +247,15 @@ namespace CaveGame.EditorTools
                 if (comp != null)
                 {
                     UnityEngine.Object.DestroyImmediate(comp);
+                    count++;
+                }
+            }
+
+            foreach (var buttonObject in buttonObjects)
+            {
+                if (buttonObject != null)
+                {
+                    UnityEngine.Object.DestroyImmediate(buttonObject);
                     count++;
                 }
             }
