@@ -105,13 +105,13 @@ namespace CaveGame
         // Zustandsübergänge
         // ---------------------------------------------------------------------
 
-        /// <summary>Reagiert auf den Start-Wunsch des Startmenüs (UI-Button / Tastatur).</summary>
+        /// <summary>Reagiert auf den Tastatur-Fallback des Startmenüs.</summary>
         private void HandleStartRequested()
         {
             RequestStart();
         }
 
-        /// <summary>Wird vom Start-Knopf (physisch oder UI) aufgerufen.</summary>
+        /// <summary>Wird vom physischen Podest-Knopf oder Tastatur-Fallback aufgerufen.</summary>
         public void RequestStart()
         {
             if (CurrentState == GameState.MainMenu)
@@ -209,7 +209,9 @@ namespace CaveGame
             switch (next)
             {
                 case GameState.MainMenu:
-                    Time.timeScale = 0f; // Startmenü pausiert ohnehin – Konsistenz herstellen.
+                    // Nicht pausieren: Der physische Podest-Knopf arbeitet mit
+                    // Trigger-Physik und muss auch im Startmenü Kollisionen empfangen.
+                    Time.timeScale = 1f;
                     HumanTetrisStartMenu.ShowMenu();
                     if (wallSpawner != null)
                     {

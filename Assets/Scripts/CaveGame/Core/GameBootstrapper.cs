@@ -21,6 +21,8 @@ namespace CaveGame
             EnsureWallSpawner();
             EnsureUi();
             RemoveLegacyStartButtons();
+            EnsurePhysicalStartPodest();
+            ApplyReferencePlatformSize();
         }
 
         private static void EnsureGameManager()
@@ -76,10 +78,8 @@ namespace CaveGame
         }
 
         /// <summary>
-        /// Der Startbildschirm besitzt jetzt genau einen Button: den beschrifteten
-        /// UI-Button, der Maus und Kinect-Handdruck gemeinsam verarbeitet. Die alten
-        /// CAVE-Sample-Buttons sowie frühere, separat erzeugte 3D-Startknöpfe würden
-        /// sonst als leere, funktionslose Knöpfe in der Szene stehen bleiben.
+        /// Die vier CAVE-Sample-Buttons sowie frühere, separat erzeugte Startknöpfe
+        /// würden sonst parallel zum neuen einzelnen Podest-Knopf stehen bleiben.
         /// </summary>
         private static void RemoveLegacyStartButtons()
         {
@@ -98,6 +98,57 @@ namespace CaveGame
                     Object.Destroy(behaviour.gameObject);
                 }
             }
+        }
+
+        /// <summary>
+        /// Verwendet das originale Podest aus dem FKI-HTW/CAVE-Sample, entfernt
+        /// dessen vier Demo-Knöpfe und baut genau einen Startknopf in der Mitte auf.
+        /// </summary>
+        private static void EnsurePhysicalStartPodest()
+        {
+            if (Object.FindObjectOfType<PhysicalStartPodestController>(true) != null)
+            {
+                return;
+            }
+
+            GameObject podest = null;
+            foreach (var transform in Object.FindObjectsOfType<Transform>(true))
+            {
+                if (transform.name == "Podest")
+                {
+                    podest = transform.gameObject;
+                    break;
+                }
+            }
+
+            if (podest == null)
+            {
+                Debug.LogError("[GameBootstrapper] Das CAVE-Podest wurde in der Szene nicht gefunden.");
+                return;
+            }
+
+            var host = new GameObject("Physical Start Podest Controller");
+            host.AddComponent<PhysicalStartPodestController>().Initialize(podest);
+        }
+
+        /// <summary>
+        /// Das Referenzprojekt verwendet eine 3 x 3 Meter große CAVE-Fläche
+        /// (CaveArea-Plane: 10 Einheiten bei Scale 0.3). Unser Plattformmodell ist
+        /// im Rohzustand 2 x 2 Meter und benötigt daher Scale 1.5 statt 4.5.
+        /// </summary>
+        private static void ApplyReferencePlatformSize()
+        {
+            foreach (var transform in Object.FindObjectsOfType<Transform>(true))
+            {
+                if (transform.name == "Plane" && transform.parent != null &&
+                    transform.parent.name == "World")
+                {
+                    transform.localScale = new Vector3(1.5f, transform.localScale.y, 1.5f);
+                    return;
+                }
+            }
+
+            Debug.LogWarning("[GameBootstrapper] Spielerplattform 'World/Plane' nicht gefunden.");
         }
     }
 }

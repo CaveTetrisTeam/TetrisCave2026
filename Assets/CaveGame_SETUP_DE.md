@@ -3,9 +3,8 @@
 Diese Demo setzt die Aufgabe aus `Unity Kinect Cave Game.pdf` um: Der Spieler steht still in der
 Höhle, **Wände mit posenförmiger Öffnung** kommen auf ihn zu. Passt sein per Kinect getracktes Skelett
 durch die Öffnung → **+100 Punkte**; berührt ein Körperteil die Wand → **ein Leben weg** (Start: 3).
-Bei 0 Leben → Game Over + Highscore. Der **Startbildschirm** bleibt erhalten und besitzt genau einen
-beschrifteten Startknopf. Dieser funktioniert per Maus und wie ein physischer Kinect-Knopf mit der
-echten Hand – **ohne sichtbaren Cursor**.
+Bei 0 Leben → Game Over + Highscore. Der **Startbildschirm** bleibt erhalten. Gestartet wird über genau
+einen digitalen physischen Knopf auf dem originalen CAVE-Podest – **ohne sichtbaren Cursor**.
 
 Unity-Version: **2022.3.59f1** (Built-in Render Pipeline). CAVE-Paket `de.htw-berlin.cave` ist bereits
 eingebunden.
@@ -53,7 +52,7 @@ Alles ist idempotent und greift nur, wenn nötig. Manuell erneut auslösbar übe
 Assets/Scripts/CaveGame/
   Core/    GameState.cs, GameManager.cs, GameBootstrapper.cs
   Kinect/  KinectPlayerPresence.cs, KinectHandInteractor.cs
-  Button/  KinectUiStartButton.cs, KinectPhysicalButton.cs (Legacy)
+  Button/  PhysicalStartPodestController.cs, KinectPhysicalButton.cs (Legacy)
   Gameplay/WallColliderBuilder.cs, Wall.cs, WallMover.cs, WallHitZone.cs,
            WallSpawner.cs, PlayerBodyPart.cs
   UI/      CaveUiFactory.cs, IngameHud.cs, SkeletonPreviewGraphic.cs, GameOverController.cs
@@ -81,8 +80,8 @@ entfernt werden, wenn er nicht gebraucht wird.
 
 `GameBootstrapper` erzeugt beim Szenenstart automatisch:
 `Game Manager`, `Kinect Player Presence`, `Kinect Hand Interactor`, `Wall Spawner`,
-`Ingame HUD` und `Game Over UI`. Der Startbildschirm erscheint wie bisher automatisch. Alte
-CAVE-Sample-Buttons werden entfernt, damit kein leerer, funktionsloser Knopf stehen bleibt.
+`Ingame HUD`, `Game Over UI` und den Controller für das vorhandene CAVE-Podest. Die vier Sample-Knöpfe
+werden entfernt und durch einen einzelnen mittigen Startknopf ersetzt.
 
 Du musst also **nur** dafür sorgen, dass die Szene folgendes enthält (siehe Schritt 3):
 das **CAVE-Rig** (Kinect) und den **Avatar-Tracker** (`PositionTransferMultiple`).
@@ -124,6 +123,7 @@ Kinect Player Presence
 Kinect Hand Interactor → "Interaction Point (invisible)"
 Wall Spawner → Wall_… (gespawnte Wände)
 Ingame HUD / Game Over UI / HumanTetris Start Menu / EventSystem
+Physical Start Podest Controller
 ```
 
 ---
@@ -192,25 +192,23 @@ Schwierigkeit: `baseSpeed`, `maxSpeed`, `speedGrowthPerSecond`, `baseInterval`, 
 
 ---
 
-## 7. Einheitlicher Kinect-Startknopf
+## 7. Physischer Podest-Startknopf
 
-Der beschriftete UI-Knopf **„Spiel starten"** ist jetzt der einzige Startknopf. Sein normaler
-`onClick`-Ablauf wird auch durch `KinectUiStartButton` ausgelöst; Maus und Kinect starten somit exakt
-dieselbe Funktion. Die Hand bleibt unsichtbar. Sie muss über dem Knopf liegen, mindestens kurz dort
-verweilen und gegenüber der Schulter weit genug nach vorne ausgestreckt werden. Der Knopf leuchtet und
-bewegt sich beim Drücken sichtbar nach unten.
+Das Podest und seine Maße/Position stammen aus dem offiziellen CAVETools-Sample. Die vier dortigen
+`ObjectToggleButton`-Knöpfe werden entfernt. `PhysicalStartPodestController` setzt stattdessen genau
+einen mittigen Trigger-Knopf ein. Rot bedeutet „Tracking noch nicht stabil“, Grün bedeutet
+„startbereit“. Berührt der unsichtbare Kinect-Hand-Collider den grünen Knopf, wird der normale
+`GameManager.RequestStart()`-Ablauf ausgelöst und der Knopf verschwindet. Das Podest bleibt Teil der
+Umgebung. Beim Zurückkehren zum Startbildschirm erscheint der Knopf erneut.
 
-Wichtige Parameter in `KinectUiStartButton`:
-- `touchReach` / `activationReach` (0.04 / 0.18 m): Beginn der Rückmeldung und Auslösetiefe.
-- `minimumContactTime` (0.12 s) + `cooldown` (1.25 s): Schutz gegen Vorbeiwischen/Doppelauslösung.
-- `requireReliableTracking`: Kinect-Auslösung nur bei stabil erkanntem Spieler.
-
-Die Maus bleibt als Entwicklungs-Fallback aktiv. Die Handposition kommt aus dem
-**`Kinect Hand Interactor`**; `calibrationOffset`, `handPreference` und `positionSmoothingTime` können
-weiter zur Kalibrierung verwendet werden.
+Der Bildschirm-Button wurde entfernt. Enter/Leertaste bleiben als Entwicklungs-Fallback. Das
+Startmenü pausiert die Physik bewusst nicht, weil sonst kein `OnTriggerEnter` ausgelöst würde.
 
 Während `Playing` zeigt das Ingame-HUD unten rechts zusätzlich **Corpus in Speculo**. Die Vorschau
 zeichnet dieselben Gelenke wie `PositionTransferMultiple`, also exakt die Pose des Kollisionsavatars.
+
+Die Spielerplattform wird zur Laufzeit auf das Referenzmaß des CAVE-Samples gesetzt: **3 × 3 Meter**.
+Das eigene 2 × 2-Meter-Rohmodell verwendet dafür X/Z-Scale **1.5** statt bisher 4.5.
 
 ---
 
@@ -229,7 +227,7 @@ Startbildschirm sowie im Game-Over-Screen angezeigt.
 
 **Ohne Kinect (Entwicklungsrechner):**
 - Play drücken. Startbildschirm erscheint.
-- Mit **Maus** auf „Spiel starten" klicken **oder** `Enter`/`Leertaste`.
+- Mit `Enter`/`Leertaste` starten; der physische Knopf benötigt echtes Kinect-Tracking.
 - In `WaitingForPlayerTracking` startet ohne getrackte Person nichts → mit `Enter`/`Leertaste`
   überspringen (Fallback). Tipp: am `GameManager` `requirePlayerTracking` aus, dann startet es direkt.
 - Wände fliegen heran, Score zählt hoch, HUD zeigt Leben/Punkte und unten rechts die Live-Pose. Treffer testest du, indem du den
@@ -239,8 +237,8 @@ Startbildschirm sowie im Game-Over-Screen angezeigt.
 
 **Mit Kinect (CAVE):**
 - Person betritt das Trackingfeld → `WaitingForPlayerTracking` wechselt zu `Playing`.
-- Skelett-Hand über „Spiel starten" führen und nach vorne ausstrecken: Knopf leuchtet, bewegt sich
-  sichtbar und löst ab der Drucktiefe aus – **kein Cursor** und kein zweiter leerer Button sichtbar.
+- Hand zum einzelnen grünen Knopf auf dem Podest führen: Der Trigger startet das Spiel und der Knopf
+  verschwindet – **kein Cursor** und keine drei zusätzlichen Demo-Knöpfe sichtbar.
 - Durch die Öffnung passen = Punkte; Wand berühren = Leben verlieren.
 
 ---

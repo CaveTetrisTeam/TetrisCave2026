@@ -10,8 +10,7 @@ namespace HumanTetris
         private const string MenuObjectName = "HumanTetris Start Menu";
 
         /// <summary>
-        /// Wird ausgelöst, wenn der Start angefordert wird – egal ob über den
-        /// klassischen UI-Button, die Tastatur oder den physischen Kinect-Knopf.
+        /// Wird ausgelöst, wenn der Start über den Tastatur-Fallback angefordert wird.
         /// Der CaveGame-GameManager hört darauf und wechselt in den Spielablauf.
         /// </summary>
         public static event Action StartRequested;
@@ -20,7 +19,9 @@ namespace HumanTetris
         private static Font _cachedMenuFont;
         private static Sprite _roundedSprite;
 
-        [SerializeField] private bool pauseGameWhileMenuIsOpen = true;
+        // Physik muss im Startmenü weiterlaufen, damit der Trigger-Collider des
+        // digitalen Podest-Knopfs die unsichtbare Kinect-Hand erkennen kann.
+        [SerializeField] private bool pauseGameWhileMenuIsOpen = false;
 
         private CanvasGroup _menuGroup;
         private Text _highscoreText;
@@ -86,7 +87,7 @@ namespace HumanTetris
 
         /// <summary>
         /// Löst den Spielstart aus: meldet <see cref="StartRequested"/> und versteckt das Menü.
-        /// Wird vom UI-Button, der Tastatur und dem physischen Kinect-Knopf genutzt.
+        /// Der physische Podest-Knopf spricht den GameManager direkt an.
         /// </summary>
         public void RequestStart()
         {
@@ -189,7 +190,8 @@ namespace HumanTetris
 
             _menuGroup = gameObject.AddComponent<CanvasGroup>();
 
-            var background = CreateImage("Background", transform, new Color(0.015f, 0.020f, 0.045f, 1f));
+            // Halbtransparent, damit das physische 3D-Podest hinter der UI sichtbar bleibt.
+            var background = CreateImage("Background", transform, new Color(0.015f, 0.020f, 0.045f, 0.68f));
             Stretch(background.rectTransform);
 
             var topGlow = CreateImage("Top Cyan Glow", background.transform, new Color(0.00f, 0.70f, 0.85f, 0.16f));
@@ -201,7 +203,7 @@ namespace HumanTetris
             var titleStripe = CreateImage("Title Stripe", background.transform, new Color(0.03f, 0.12f, 0.18f, 0.78f));
             SetRect(titleStripe.rectTransform, 0f, 158f, 1920f, 260f);
 
-            var panel = CreateImage("Menu Panel", background.transform, new Color(0.02f, 0.04f, 0.075f, 0.74f));
+            var panel = CreateImage("Menu Panel", background.transform, new Color(0.02f, 0.04f, 0.075f, 0.30f));
             Stretch(panel.rectTransform);
 
             CreateTetromino(panel.transform, "Left Tetris Piece", new Vector2(-720f, 55f), 62f, new Color(0.00f, 0.83f, 0.96f), new[]
@@ -236,7 +238,9 @@ namespace HumanTetris
             var title = CreateText("Title", panel.transform, "Human Tetris", 78, FontStyle.Bold, TextAnchor.MiddleCenter, new Color(0.95f, 1f, 1f));
             SetRect(title.rectTransform, 0f, 200f, 900f, 120f);
 
-            var subtitle = CreateText("Subtitle", panel.transform, "Weiche den Formen aus und knacke deinen Rekord.", 30, FontStyle.Normal, TextAnchor.MiddleCenter, new Color(0.72f, 0.92f, 1f));
+            var subtitle = CreateText("Subtitle", panel.transform,
+                "Berühre den Knopf auf dem Podest, um zu starten.", 30,
+                FontStyle.Normal, TextAnchor.MiddleCenter, new Color(0.72f, 0.92f, 1f));
             SetRect(subtitle.rectTransform, 0f, 105f, 840f, 70f);
 
             var highscorePlate = CreateRoundedImage("Highscore Plate", panel.transform, new Color(0.00f, 0.72f, 0.86f, 0.16f));
@@ -245,10 +249,6 @@ namespace HumanTetris
             _highscoreText = CreateText("Highscore", highscorePlate.transform, string.Empty, 44, FontStyle.Bold, TextAnchor.MiddleCenter, new Color(0.92f, 1f, 0.55f));
             Stretch(_highscoreText.rectTransform);
             MoveRect(_highscoreText.rectTransform, 0f, -3f);
-
-            var startButton = CreateButton(panel.transform);
-            SetRect(startButton.GetComponent<RectTransform>(), 0f, -145f, 360f, 90f);
-            startButton.onClick.AddListener(RequestStart);
 
             RefreshHighscore();
         }
@@ -440,30 +440,6 @@ namespace HumanTetris
             {
                 return null;
             }
-        }
-
-        private static Button CreateButton(Transform parent)
-        {
-            var buttonImage = CreateRoundedImage("Start Button", parent, new Color(1.00f, 0.38f, 0.20f));
-            var button = buttonImage.gameObject.AddComponent<Button>();
-            button.targetGraphic = buttonImage;
-
-            var colors = button.colors;
-            colors.normalColor = new Color(1.00f, 0.38f, 0.20f);
-            colors.highlightedColor = new Color(1.00f, 0.58f, 0.23f);
-            colors.pressedColor = new Color(0.78f, 0.18f, 0.12f);
-            colors.selectedColor = colors.highlightedColor;
-            button.colors = colors;
-
-            var buttonText = CreateText("Label", button.transform, "Spiel starten", 34, FontStyle.Bold, TextAnchor.MiddleCenter, Color.white);
-            Stretch(buttonText.rectTransform);
-            MoveRect(buttonText.rectTransform, 0f, -4f);
-
-            // Derselbe sichtbare Button verarbeitet zusätzlich den unsichtbaren
-            // Kinect-Handdruck. Dadurch gibt es keinen zweiten, leeren 3D-Knopf mehr.
-            button.gameObject.AddComponent<CaveGame.KinectUiStartButton>();
-
-            return button;
         }
 
         private static void Stretch(RectTransform rectTransform)
