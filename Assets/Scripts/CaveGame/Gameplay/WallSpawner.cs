@@ -57,7 +57,7 @@ namespace CaveGame
         [Tooltip("Welt-Tiefe der Wand-Collider (Z).")]
         public float colliderThickness = 0.3f;
         [Tooltip("Zusätzliche kollisionsfreie Toleranz rund um die sichtbare Körperöffnung (Meter).")]
-        public float openingHitboxPadding = 0.08f;
+        public float openingHitboxPadding = 0.18f;
         [Tooltip("Layer der Avatar-Körperteile. Leer = automatisch Layer 'Player'.")]
         public LayerMask playerLayers;
 
