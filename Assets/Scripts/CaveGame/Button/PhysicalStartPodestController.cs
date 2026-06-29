@@ -100,8 +100,9 @@ namespace CaveGame
                                Time.unscaledTime - m_ButtonShownAt >= appearGracePeriod &&
                                m_Interactor != null && m_Interactor.HasHand;
 
+            PodestAction candidate = default;
             bool hasCandidate = canInteract &&
-                                TryGetTargetAction(state, m_Interactor.HandPosition, out var candidate);
+                                TryGetTargetAction(state, m_Interactor.HandPosition, out candidate);
 
             float dt = Time.unscaledDeltaTime;
             float fill = 1f / Mathf.Max(0.05f, holdTime);
