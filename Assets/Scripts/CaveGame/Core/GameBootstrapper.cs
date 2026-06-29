@@ -22,7 +22,7 @@ namespace CaveGame
             ConfigureMonoCaveProjection();
             EnsureWallSpawner();
             EnsureUi();
-            RemoveLegacyStartButtons();
+            RemoveSampleToggleButtons();
             EnsurePhysicalStartPodest();
             ApplyReferencePlatformSize();
         }
@@ -105,19 +105,11 @@ namespace CaveGame
         }
 
         /// <summary>
-        /// Die vier CAVE-Sample-Buttons sowie frühere, separat erzeugte Startknöpfe
-        /// würden sonst parallel zum neuen einzelnen Podest-Knopf stehen bleiben.
+        /// Entfernt die vier CAVE-Sample-Knöpfe (ObjectToggleButton), die sonst parallel
+        /// zum eigenen Podest-Knopf stehen blieben.
         /// </summary>
-        private static void RemoveLegacyStartButtons()
+        private static void RemoveSampleToggleButtons()
         {
-            foreach (var physicalButton in Object.FindObjectsOfType<KinectPhysicalButton>(true))
-            {
-                if (physicalButton != null)
-                {
-                    Object.Destroy(physicalButton.gameObject);
-                }
-            }
-
             foreach (var behaviour in Object.FindObjectsOfType<MonoBehaviour>(true))
             {
                 if (behaviour != null && behaviour.GetType().Name == "ObjectToggleButton")

@@ -52,7 +52,7 @@ Alles ist idempotent und greift nur, wenn nötig. Manuell erneut auslösbar übe
 Assets/Scripts/CaveGame/
   Core/    GameState.cs, GameManager.cs, GameBootstrapper.cs
   Kinect/  KinectPlayerPresence.cs, KinectHandInteractor.cs
-  Button/  PhysicalStartPodestController.cs, KinectPhysicalButton.cs (Legacy)
+  Button/  PhysicalStartPodestController.cs
   Gameplay/WallColliderBuilder.cs, Wall.cs, WallMover.cs, WallHitZone.cs,
            WallSpawner.cs, PlayerBodyPart.cs
   UI/      CaveUiFactory.cs, IngameHud.cs, SkeletonPreviewGraphic.cs, GameOverController.cs
@@ -196,13 +196,23 @@ Schwierigkeit: `baseSpeed`, `maxSpeed`, `speedGrowthPerSecond`, `baseInterval`, 
 
 Das Podest und seine Maße/Position stammen aus dem offiziellen CAVETools-Sample. Die vier dortigen
 `ObjectToggleButton`-Knöpfe werden entfernt. `PhysicalStartPodestController` setzt stattdessen genau
-einen mittigen Trigger-Knopf ein. Rot bedeutet „Tracking noch nicht stabil“, Grün bedeutet
-„startbereit“. Berührt der unsichtbare Kinect-Hand-Collider den grünen Knopf, wird der normale
-`GameManager.RequestStart()`-Ablauf ausgelöst und der Knopf verschwindet. Das Podest bleibt Teil der
-Umgebung. Beim Zurückkehren zum Startbildschirm erscheint der Knopf erneut.
+einen mittigen Startknopf ein (bei Game Over zwei Knöpfe: Neustart / Menü). Rot = „Tracking noch nicht
+stabil“, Grün = „startbereit“.
 
-Der Bildschirm-Button wurde entfernt. Enter/Leertaste bleiben als Entwicklungs-Fallback. Das
-Startmenü pausiert die Physik bewusst nicht, weil sonst kein `OnTriggerEnter` ausgelöst würde.
+**Auslösung (robust):** Statt eines winzigen, schwer zu treffenden Trigger-Cubes wird **distanzbasiert
+mit kurzem Halten** ausgelöst. Die getrackte (unsichtbare) Hand muss nur in die Nähe des Knopfes kommen
+(`activationRadius`, Standard 0.22 m) und dort kurz bleiben (`holdTime`, Standard 0.5 s). Der Knopf
+füllt sich dabei sichtbar von Grün → Druckfarbe und löst dann `GameManager.RequestStart()` aus. Das ist
+unempfindlich gegen Tracking-Jitter und gegen versehentliches Vorbeiwischen.
+
+**Falls der Knopf weiterhin schwer erreichbar ist** („etwas weiter nach vorne“):
+- `activationRadius` am `PhysicalStartPodestController` erhöhen (z. B. 0.3) – verzeiht mehr Ungenauigkeit.
+- Oder das **Podest** in der Szene näher zur Spielerposition / weiter nach vorne (Z) schieben; der
+  Knopf folgt dem Podest. (Die Hand bewegt sich im gespiegelten Avatar-Raum – der Knopf muss dort
+  liegen, wo die sichtbare Avatar-Hand hinreicht.)
+- `holdTime` verringern, wenn das Halten zu lang wirkt.
+
+Der Bildschirm-Button wurde entfernt. Enter/Leertaste bleiben als Entwicklungs-Fallback.
 
 Während `Playing` zeigt das Ingame-HUD unten rechts zusätzlich **Corpus in Speculo**. Die Vorschau
 zeichnet dieselben Gelenke wie `PositionTransferMultiple`, also exakt die Pose des Kollisionsavatars.

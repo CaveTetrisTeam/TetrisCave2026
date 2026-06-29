@@ -117,33 +117,63 @@ namespace CaveGame
             return false;
         }
 
-        private bool TryResolveFromAvatar(out Vector3 position)
+        /// <summary>
+        /// Liefert das Körperteil-Wörterbuch des primären Avatars (gespiegelter Raum),
+        /// sonst des ersten vorhandenen Avatars.
+        /// </summary>
+        private bool TryGetAvatarParts(out System.Collections.Generic.Dictionary<string, GameObject> parts)
         {
-            position = default;
+            parts = null;
 
             if (m_AvatarTracker == null || m_AvatarTracker.joints == null || m_AvatarTracker.joints.Count == 0)
             {
                 return false;
             }
 
-            // Passenden Aktor bestimmen (primärer Spieler, sonst erster vorhandener).
-            System.Collections.Generic.Dictionary<string, GameObject> parts = null;
             var primaryName = m_Presence != null && m_Presence.PrimaryActor != null ? m_Presence.PrimaryActor.name : null;
 
             if (primaryName != null && m_AvatarTracker.joints.TryGetValue(primaryName, out var named))
             {
                 parts = named;
-            }
-            else
-            {
-                foreach (var kvp in m_AvatarTracker.joints)
-                {
-                    parts = kvp.Value;
-                    break;
-                }
+                return true;
             }
 
-            if (parts == null)
+            foreach (var kvp in m_AvatarTracker.joints)
+            {
+                parts = kvp.Value;
+                return true;
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Weltposition eines Avatar-Gelenks (gespiegelter Raum – gleicher Raum wie
+        /// <see cref="HandPosition"/>). Gültige Namen z. B. "SpineMid", "ShoulderLeft",
+        /// "ShoulderRight", "Head". Liefert false, wenn (noch) kein Avatar getrackt wird.
+        /// </summary>
+        public bool TryGetAvatarJoint(string partName, out Vector3 worldPos)
+        {
+            worldPos = default;
+            if (!TryGetAvatarParts(out var parts))
+            {
+                return false;
+            }
+
+            if (parts.TryGetValue(partName, out var go) && go != null)
+            {
+                worldPos = go.transform.position;
+                return true;
+            }
+
+            return false;
+        }
+
+        private bool TryResolveFromAvatar(out Vector3 position)
+        {
+            position = default;
+
+            if (!TryGetAvatarParts(out var parts))
             {
                 return false;
             }
