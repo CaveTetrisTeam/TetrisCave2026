@@ -1,3 +1,4 @@
+using System.IO;
 using UnityEngine;
 using HTW.CAVE;
 using Whisper;
@@ -160,11 +161,25 @@ namespace CaveGame
         /// auf das kleine Modell und Deutsch. Das GameObject wird inaktiv erzeugt, damit
         /// Modellpfad/Sprache gesetzt werden, BEVOR der WhisperManager im Awake lädt.
         /// </summary>
+        private const string VoiceModelRelativePath = "Whisper/ggml-small.bin";
+
         private static void EnsureSpeechToText()
         {
             if (Object.FindObjectOfType<EchoMotionSpeechToText>(true) != null)
             {
                 return; // bereits vorhanden (z. B. manuell platziert) -> respektieren
+            }
+
+            // Ohne vorhandene Modell-Datei NICHT initialisieren – sonst wirft der
+            // WhisperManager beim Laden eine NullReferenceException. Voice bleibt dann
+            // einfach aus (Hand/Tastatur funktionieren weiter).
+            string modelFullPath = Path.Combine(Application.streamingAssetsPath, VoiceModelRelativePath);
+            if (!File.Exists(modelFullPath))
+            {
+                Debug.LogWarning("[GameBootstrapper] Sprachmodell nicht gefunden: " + modelFullPath +
+                                 "\nSprachsteuerung ist deaktiviert. Lege 'ggml-small.bin' in " +
+                                 "Assets/StreamingAssets/Whisper/ ab (siehe CaveGame_SETUP_DE.md, Abschnitt 7c).");
+                return;
             }
 
             try
@@ -174,7 +189,7 @@ namespace CaveGame
 
                 var whisper = go.AddComponent<WhisperManager>();
                 whisper.IsModelPathInStreamingAssets = true;
-                whisper.ModelPath = "Whisper/ggml-small.bin";
+                whisper.ModelPath = VoiceModelRelativePath;
                 whisper.language = "de";
 
                 var mic = go.AddComponent<MicrophoneRecord>();
