@@ -172,6 +172,35 @@ namespace CaveGame
             return false;
         }
 
+        /// <summary>
+        /// Per Sprachbefehl auslösen (gleiche Regeln wie der Hand-Knopf: nur im passenden
+        /// Zustand, Cooldown, Einblende-Sperre und – falls verlangt – zuverlässiges Tracking).
+        /// </summary>
+        public bool TryTriggerByVoice(PodestAction action)
+        {
+            ResolveDependencies();
+
+            var manager = GameManager.Instance;
+            if (manager == null || !IsActionAvailable(action, manager.CurrentState))
+            {
+                return false;
+            }
+
+            if (Time.unscaledTime - m_LastActivation < cooldown ||
+                Time.unscaledTime - m_ButtonShownAt < appearGracePeriod)
+            {
+                return false;
+            }
+
+            if (requireReliableTracking && (m_Presence == null || !m_Presence.HasReliablePlayer))
+            {
+                return false;
+            }
+
+            Activate(action);
+            return true;
+        }
+
         private void Activate(PodestAction action)
         {
             var manager = GameManager.Instance;

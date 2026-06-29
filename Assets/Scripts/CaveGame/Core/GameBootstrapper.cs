@@ -1,5 +1,7 @@
 using UnityEngine;
 using HTW.CAVE;
+using Whisper;
+using Whisper.Utils;
 
 namespace CaveGame
 {
@@ -23,7 +25,9 @@ namespace CaveGame
             EnsureWallSpawner();
             EnsureUi();
             RemoveSampleToggleButtons();
+            EnsureSpeechToText();
             EnsurePhysicalStartPodest();
+            EnsureVoiceControl();
             ApplyReferencePlatformSize();
         }
 
@@ -148,6 +152,56 @@ namespace CaveGame
 
             var host = new GameObject("Physical Start Podest Controller");
             host.AddComponent<PhysicalStartPodestController>().Initialize(podest);
+        }
+
+        /// <summary>
+        /// Legt den Echo-Motion-Sprach-Stack (WhisperManager + MicrophoneRecord +
+        /// EchoMotionSpeechToText) an, falls in der Szene keiner vorhanden ist – konfiguriert
+        /// auf das kleine Modell und Deutsch. Das GameObject wird inaktiv erzeugt, damit
+        /// Modellpfad/Sprache gesetzt werden, BEVOR der WhisperManager im Awake lädt.
+        /// </summary>
+        private static void EnsureSpeechToText()
+        {
+            if (Object.FindObjectOfType<EchoMotionSpeechToText>(true) != null)
+            {
+                return; // bereits vorhanden (z. B. manuell platziert) -> respektieren
+            }
+
+            try
+            {
+                var go = new GameObject("Echo-Motion Speech (Voice Control)");
+                go.SetActive(false);
+
+                var whisper = go.AddComponent<WhisperManager>();
+                whisper.IsModelPathInStreamingAssets = true;
+                whisper.ModelPath = "Whisper/ggml-small.bin";
+                whisper.language = "de";
+
+                var mic = go.AddComponent<MicrophoneRecord>();
+
+                var stt = go.AddComponent<EchoMotionSpeechToText>();
+                stt.whisper = whisper;
+                stt.microphoneRecord = mic;
+                stt.autoInitWhisper = true;
+
+                go.SetActive(true);
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogWarning("[GameBootstrapper] Sprach-Stack konnte nicht angelegt werden – " +
+                                 "Sprachsteuerung inaktiv (Hand/Tastatur bleibt). " + e.Message);
+            }
+        }
+
+        private static void EnsureVoiceControl()
+        {
+            if (Object.FindObjectOfType<PodestVoiceControl>(true) != null)
+            {
+                return;
+            }
+
+            var go = new GameObject("Podest Voice Control");
+            go.AddComponent<PodestVoiceControl>();
         }
 
         /// <summary>

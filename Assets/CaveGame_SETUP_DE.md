@@ -52,7 +52,7 @@ Alles ist idempotent und greift nur, wenn nötig. Manuell erneut auslösbar übe
 Assets/Scripts/CaveGame/
   Core/    GameState.cs, GameManager.cs, GameBootstrapper.cs
   Kinect/  KinectPlayerPresence.cs, KinectHandInteractor.cs
-  Button/  PhysicalStartPodestController.cs
+  Button/  PhysicalStartPodestController.cs, PodestVoiceControl.cs
   Gameplay/WallColliderBuilder.cs, Wall.cs, WallMover.cs, WallHitZone.cs,
            WallSpawner.cs, PlayerBodyPart.cs
   UI/      CaveUiFactory.cs, IngameHud.cs, SkeletonPreviewGraphic.cs, GameOverController.cs
@@ -219,6 +219,62 @@ zeichnet dieselben Gelenke wie `PositionTransferMultiple`, also exakt die Pose d
 
 Die Spielerplattform wird zur Laufzeit auf das Referenzmaß des CAVE-Samples gesetzt: **3 × 3 Meter**.
 Das eigene 2 × 2-Meter-Rohmodell verwendet dafür X/Z-Scale **1.5** statt bisher 4.5.
+
+---
+
+## 7b. Sprachsteuerung des Podests
+
+Zusätzlich zur Hand lassen sich die Podest-Knöpfe per **Sprache** auslösen
+(`PodestVoiceControl`). Das Mikrofon hört **automatisch** zu, solange das Podest sichtbar ist
+(MainMenu / Game Over), und ist sonst aus (keine Fehlauslösung). Erkannte Befehle:
+
+- **Startbildschirm:** „Start", „Los", „Spiel", „Beginnen" … → Spiel starten
+- **Game Over:** „Neustart", „Nochmal", „Wiederholen" … → Neustart ·
+  „Menü", „Zurück", „Startbildschirm" … → Hauptmenü
+
+Auslösung folgt denselben Regeln wie der Hand-Knopf (nur im passenden Zustand, Cooldown,
+zuverlässiges Tracking). Es wird VAD-fenstergesteuert transkribiert (nur wenn jemand spricht).
+
+**Voraussetzungen:** ein Mikrofon am Rechner **und** das heruntergeladene Whisper-Modell (Abschnitt 7c).
+Fehlt der Sprach-Stack/das Modell, bleibt einfach Hand + Tastatur aktiv.
+
+Der Bootstrapper legt den Sprach-Stack (WhisperManager + MicrophoneRecord + EchoMotionSpeechToText)
+automatisch an (Modell **small**, Sprache **de**), falls in der Szene keiner vorhanden ist. Ein
+selbst platzierter Stack hat Vorrang.
+
+Stellschrauben am `PodestVoiceControl`: die Keyword-Listen `startKeywords` / `restartKeywords` /
+`menuKeywords` und `vadStopTime` (Stille bis zur Auswertung).
+
+---
+
+## 7c. Whisper-Modell auf „small" umstellen & herunterladen
+
+Das Projekt nutzt jetzt überall das **small**-Modell (statt tiny): besser bei deutscher Erkennung,
+dafür größer (~488 MB) und etwas langsamer. Die Konfiguration zeigt bereits auf
+`Whisper/ggml-small.bin` (auto-erzeugter Stack **und** `test2.unity`). Die Modell-Datei selbst ist
+**nicht** im Git (zu groß) und muss **pro Rechner einmal** heruntergeladen werden.
+
+**Modell herunterladen (auf dem CAVE-/Main-Rechner):**
+
+1. Datei `ggml-small.bin` (multilingual!) besorgen – z. B. per Terminal:
+   ```bash
+   curl -L -o "Assets/StreamingAssets/Whisper/ggml-small.bin" \
+     https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin
+   ```
+   (oder im Browser von <https://huggingface.co/ggerganov/whisper.cpp/tree/main> laden und nach
+   `Assets/StreamingAssets/Whisper/` legen). **Nicht** `ggml-small.en.bin` nehmen – das ist nur Englisch.
+2. In Unity kurz warten, bis der Import durch ist. Fertig – beim Start lädt der `WhisperManager`
+   automatisch `ggml-small.bin`.
+
+**Wo das Modell konfiguriert ist (falls du es manuell ändern willst):**
+- `WhisperManager`-Komponente → Feld **Model Path** = `Whisper/ggml-small.bin`,
+  **Is Model Path In Streaming Assets** = an, **Language** = `de`.
+
+**Hinweise:**
+- `.gitignore` ignoriert `ggml-small*.bin` bereits → wird nicht eingecheckt, jeder Rechner lädt es lokal.
+- Das alte `ggml-tiny.bin` (im Git, ~77 MB) wird nicht mehr verwendet. Optional entfernen:
+  `git rm Assets/StreamingAssets/Whisper/ggml-tiny.bin` (dann committen).
+- Anderes Modell gewünscht (z. B. `medium`)? Datei ablegen und denselben `ModelPath` anpassen.
 
 ---
 
