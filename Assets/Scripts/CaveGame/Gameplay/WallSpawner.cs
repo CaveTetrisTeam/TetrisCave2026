@@ -23,6 +23,12 @@ namespace CaveGame
         [Header("Platzierung (Weltkoordinaten)")]
         [Tooltip("Z-Position, an der Wände erscheinen (weit vorne).")]
         public float spawnZ = 40f;
+        [Tooltip("Z-Position der ERSTEN Wand nach Spielstart. Näher = kommt früher (weniger Anfangswarten). " +
+                 "Bei baseSpeed 5 ≈ Sekunden bis zum Spieler = Wert/5.")]
+        public float firstWallSpawnZ = 20f;
+        [Tooltip("Über wie viele Wände die Spawn-Distanz von firstWallSpawnZ auf spawnZ hochrampt " +
+                 "(gleichmäßiges Anfangstempo statt 'erste früh, dann große Lücke').")]
+        public int spawnDistanceRampWalls = 3;
         [Tooltip("Z-Position der Spielerebene (dort steht der Avatar).")]
         public float playerPlaneZ = 0f;
         [Tooltip("Z-Position, an der Wände hinter dem Spieler verschwinden.")]
@@ -62,13 +68,15 @@ namespace CaveGame
         public LayerMask playerLayers;
 
         [Header("Geschwindigkeit / Schwierigkeit")]
-        public float baseSpeed = 5f;
-        public float maxSpeed = 14f;
-        public float speedGrowthPerSecond = 0.15f;
+        public float baseSpeed = 7f;
+        public float maxSpeed = 12f;
+        public float speedGrowthPerSecond = 0.1f;
 
         [Header("Spawn-Frequenz")]
-        public float baseInterval = 3.0f;
-        public float minInterval = 1.2f;
+        [Tooltip("Zeit zwischen zwei Wänden am Anfang (größer = mehr Abstand).")]
+        public float baseInterval = 3.5f;
+        [Tooltip("Kürzestes Intervall bei maximaler Schwierigkeit (nicht zu klein, sonst zu eng).")]
+        public float minInterval = 2.3f;
         [Tooltip("Über wie viele Sekunden das Intervall von base auf min sinkt.")]
         public float rampSeconds = 90f;
 
@@ -139,9 +147,18 @@ namespace CaveGame
 
         private IEnumerator SpawnLoop()
         {
+            int index = 0;
             while (true)
             {
-                SpawnOne();
+                // Erste Wand näher (kommt früher); danach rampt die Spawn-Distanz über
+                // wenige Wände auf den vollen Abstand hoch -> gleichmäßiges Tempo statt
+                // "erste früh, dann große Lücke".
+                float t = spawnDistanceRampWalls > 0
+                    ? Mathf.Clamp01(index / (float)spawnDistanceRampWalls)
+                    : 1f;
+                float z = Mathf.Lerp(Mathf.Min(firstWallSpawnZ, spawnZ), spawnZ, t);
+                SpawnOne(z);
+                index++;
                 yield return new WaitForSeconds(CurrentInterval());
             }
         }
@@ -159,7 +176,7 @@ namespace CaveGame
             return Mathf.Lerp(baseInterval, minInterval, t);
         }
 
-        private void SpawnOne()
+        private void SpawnOne(float zPosition)
         {
             if (m_Sprites == null || m_Sprites.Length == 0)
             {
@@ -167,14 +184,14 @@ namespace CaveGame
             }
 
             var sprite = m_Sprites[Random.Range(0, m_Sprites.Length)];
-            var wall = CreateWall(sprite);
+            var wall = CreateWall(sprite, zPosition);
             m_ActiveWalls.Add(wall);
 
             wall.GetComponent<WallMover>().Launch(
                 CurrentSpeed(), playerPlaneZ, despawnZ, resolveMargin, ReleaseWall);
         }
 
-        private GameObject CreateWall(Sprite sprite)
+        private GameObject CreateWall(Sprite sprite, float zPosition)
         {
             var go = new GameObject("Wall_" + sprite.name);
             go.transform.SetParent(transform, false);
@@ -200,7 +217,7 @@ namespace CaveGame
                 float desiredHoleBottom = m_SessionFloorY - lowerClearance + wallVerticalOffset;
                 calibratedY = desiredHoleBottom - hole.min.y * scale;
             }
-            go.transform.position = new Vector3(wallCenter.x, calibratedY, spawnZ);
+            go.transform.position = new Vector3(wallCenter.x, calibratedY, zPosition);
 
             var renderer = go.AddComponent<SpriteRenderer>();
             renderer.sprite = sprite;

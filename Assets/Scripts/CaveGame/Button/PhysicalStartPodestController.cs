@@ -303,9 +303,9 @@ namespace CaveGame
             Vector3 right = Camera.main != null ? Camera.main.transform.right : Vector3.right;
             right.y = 0f;
             right = right.sqrMagnitude > 0.0001f ? right.normalized : Vector3.right;
-            // Seiten an die gespiegelte CAVE-Ansicht angepasst: Neustart rechts, Menü links.
-            m_RestartButton.transform.position = center + right * gameOverButtonSeparation;
-            m_MenuButton.transform.position = center - right * gameOverButtonSeparation;
+            // Seiten getauscht: Neustart links, Menü rechts.
+            m_RestartButton.transform.position = center - right * gameOverButtonSeparation;
+            m_MenuButton.transform.position = center + right * gameOverButtonSeparation;
 
             SetButtonColor(m_StartMaterial, waitingColor);
             SetButtonColor(m_RestartMaterial, waitingColor);

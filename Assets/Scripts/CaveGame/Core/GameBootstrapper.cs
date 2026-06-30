@@ -26,9 +26,11 @@ namespace CaveGame
             EnsureWallSpawner();
             EnsureUi();
             RemoveSampleToggleButtons();
-            EnsureSpeechToText();
+            // Sprachsteuerung vorerst deaktiviert (kein Spielstart per Stimme).
+            // Zum Reaktivieren einfach die beiden folgenden Aufrufe wieder einkommentieren:
+            // EnsureSpeechToText();
             EnsurePhysicalStartPodest();
-            EnsureVoiceControl();
+            // EnsureVoiceControl();
             ApplyReferencePlatformSize();
         }
 
