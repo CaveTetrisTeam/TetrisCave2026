@@ -158,6 +158,7 @@ MonoBehaviour:
   bodyPrefab: {fileID: 6447044102534172081, guid: 6171380971d754e47829a50deffa4403, type: 3}
   particlePrefab: {fileID: 3486334340852444976, guid: 30d18ae04d04bb54999a282dc8707577, type: 3}
   collisionSound: {fileID: 8300000, guid: 89d1fcd2b23a3894fb3a294bda493116, type: 3}
+  hideSourceActorRenderers: 1
 --- !u!4 &62372940
 Transform:
   m_ObjectHideFlags: 0
@@ -2694,6 +2695,8 @@ MonoBehaviour:
   - {fileID: 8300000, guid: a23e8ef3642ed774fb259f4b27a1206c, type: 3}
   - {fileID: 8300000, guid: 051903949069ad64eb01e382d5133e11, type: 3}
   - {fileID: 8300000, guid: 5a58750fdd5bcba45b8bb207b1803eba, type: 3}
+  - {fileID: 8300000, guid: 6f6b5fbc5bb838d42b651b6319237ed6, type: 3}
+  - {fileID: 8300000, guid: 37ca7818f88c4a04c963d3285615739e, type: 3}
 --- !u!1 &1202135181
 GameObject:
   m_ObjectHideFlags: 0
