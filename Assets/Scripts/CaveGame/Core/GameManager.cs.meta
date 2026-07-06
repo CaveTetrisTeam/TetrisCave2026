@@ -3,7 +3,10 @@ guid: cf52b5995f8704af19f049797ddabcd0
 MonoImporter:
   externalObjects: {}
   serializedVersion: 2
-  defaultReferences: []
+  defaultReferences:
+  - gameOverSound: {fileID: 8300000, guid: 6e807b17d18f42547bf992d3741bca6e, type: 3}
+  - wallSpawner: {instanceID: 0}
+  - playerPresence: {instanceID: 0}
   executionOrder: 0
   icon: {instanceID: 0}
   userData: 

@@ -30,6 +30,10 @@ namespace CaveGame
         [Tooltip("Punkte pro erfolgreich überquerter Wand.")]
         public int pointsPerWall = 100;
 
+        [Header("Audio Einstellungen")]
+        [Tooltip("Der Sound, der beim Game Over abgespielt wird.")]
+        public AudioClip gameOverSound;
+
         [Header("Tracking")]
         [Tooltip("Wenn aktiv, darf das Spiel nur starten, wenn eine Person zuverlässig getrackt wird. " +
                  "Per Tastatur (Enter/Leertaste) kann zum Testen trotzdem gestartet werden (UI-Fallback).")]
@@ -45,6 +49,8 @@ namespace CaveGame
         public int Lives { get; private set; }
         public int Score => HumanTetrisHighscore.CurrentScore;
 
+        private AudioSource m_LocalAudioSource;
+
         private void Awake()
         {
             if (Instance != null && Instance != this)
@@ -55,6 +61,13 @@ namespace CaveGame
 
             Instance = this;
             DontDestroyOnLoad(gameObject);
+
+            // Holt sich eine AudioSource auf dem GameManager oder erstellt eine neue
+            m_LocalAudioSource = GetComponent<AudioSource>();
+            if (m_LocalAudioSource == null)
+            {
+                m_LocalAudioSource = gameObject.AddComponent<AudioSource>();
+            }
         }
 
         private void OnEnable()
@@ -209,8 +222,6 @@ namespace CaveGame
             switch (next)
             {
                 case GameState.MainMenu:
-                    // Nicht pausieren: Der physische Podest-Knopf arbeitet mit
-                    // Trigger-Physik und muss auch im Startmenü Kollisionen empfangen.
                     Time.timeScale = 1f;
                     HumanTetrisStartMenu.ShowMenu();
                     if (wallSpawner != null)
@@ -247,8 +258,14 @@ namespace CaveGame
                         wallSpawner.StopSpawning();
                         wallSpawner.FreezeAllWalls(); // Wandbewegung stoppen (PDF).
                     }
-                    // Highscore sichern (AddToCurrentScore speichert zwar bereits laufend,
-                    // dies ist die ausdrückliche Game-Over-Sicherung laut PDF).
+
+                    // --- HIER WIRD DER GAME OVER SOUND ABGESPIELT ---
+                    if (m_LocalAudioSource != null && gameOverSound != null)
+                    {
+                        m_LocalAudioSource.PlayOneShot(gameOverSound);
+                    }
+                    // ------------------------------------------------
+
                     HumanTetrisHighscore.SaveIfHigher(HumanTetrisHighscore.CurrentScore);
                     break;
             }
