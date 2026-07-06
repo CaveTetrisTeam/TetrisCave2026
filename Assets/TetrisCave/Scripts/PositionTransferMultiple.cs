@@ -1,286 +1,332 @@
 using System.Collections.Generic;
-using UnityEditor;
+using HTW.CAVE.Kinect;
 using UnityEngine;
+using Windows.Kinect;
+
 /// <summary>
-/// Takes the tracked Kinect positions from the Kinect Actor instances (Cave --> Kinect Tracker --> Kinect Actor # ...)
-/// Transfers the positions of joints and mirrors them to the avatar
-/// Mirrored joints of the avatar are connected by a line renderer
+/// Erzeugt den gespiegelten Corpus-in-Speculo-Avatar direkt aus den verfolgten
+/// <see cref="KinectActor"/>-Daten. Avatarvisualisierung, HUD-Vorschau und
+/// Gameplay-Collider verwenden dadurch garantiert dieselbe Pose.
 /// </summary>
-public class PositionTransferMultiple : MonoBehaviour
+public sealed class PositionTransferMultiple : MonoBehaviour
 {
-    private Dictionary<string, GameObject> actors = new Dictionary<string, GameObject>();
-    private Dictionary<string, GameObject> avatarRoots = new Dictionary<string, GameObject>(); // Gameobjects containing the body parts and line renderer objects
-    public Dictionary<string, Dictionary<string, GameObject>> joints = new Dictionary<string, Dictionary<string, GameObject>>();
-    private Dictionary<string, Dictionary<string, LineRenderer>> jointLines = new Dictionary<string, Dictionary<string, LineRenderer>>();
+    private struct JointBinding
+    {
+        public readonly string name;
+        public readonly JointType type;
 
-    private HashSet<string> initializedActors = new HashSet<string>(); // initialized actors to compare which actors are not tracked anymore
+        public JointBinding(string name, JointType type)
+        {
+            this.name = name;
+            this.type = type;
+        }
+    }
 
-    public Vector3 mirrorPlanePoint = new Vector3(0, 0, 0);
+    private struct BoneBinding
+    {
+        public readonly string name;
+        public readonly JointType from;
+        public readonly JointType to;
+
+        public BoneBinding(string name, JointType from, JointType to)
+        {
+            this.name = name;
+            this.from = from;
+            this.to = to;
+        }
+    }
+
+    private static readonly JointBinding[] JointBindings =
+    {
+        new JointBinding("Head", JointType.Head),
+        new JointBinding("Neck", JointType.Neck),
+        new JointBinding("SpineBase", JointType.SpineBase),
+        new JointBinding("SpineMid", JointType.SpineMid),
+        new JointBinding("HipLeft", JointType.HipLeft),
+        new JointBinding("HipRight", JointType.HipRight),
+        new JointBinding("KneeLeft", JointType.KneeLeft),
+        new JointBinding("KneeRight", JointType.KneeRight),
+        new JointBinding("AnkleLeft", JointType.AnkleLeft),
+        new JointBinding("AnkleRight", JointType.AnkleRight),
+        new JointBinding("FootLeft", JointType.FootLeft),
+        new JointBinding("FootRight", JointType.FootRight),
+        new JointBinding("ShoulderLeft", JointType.ShoulderLeft),
+        new JointBinding("ShoulderRight", JointType.ShoulderRight),
+        new JointBinding("ElbowLeft", JointType.ElbowLeft),
+        new JointBinding("ElbowRight", JointType.ElbowRight),
+        new JointBinding("HandLeft", JointType.HandLeft),
+        new JointBinding("HandRight", JointType.HandRight)
+    };
+
+    private static readonly BoneBinding[] BoneBindings =
+    {
+        new BoneBinding("Line_Neck_Head", JointType.Neck, JointType.Head),
+        new BoneBinding("Line_SpineMid_Neck", JointType.SpineMid, JointType.Neck),
+        new BoneBinding("Line_SpineBase_SpineMid", JointType.SpineBase, JointType.SpineMid),
+        new BoneBinding("Line_SpineMid_ShoulderLeft", JointType.SpineMid, JointType.ShoulderLeft),
+        new BoneBinding("Line_SpineMid_ShoulderRight", JointType.SpineMid, JointType.ShoulderRight),
+        new BoneBinding("Line_ShoulderLeft_ElbowLeft", JointType.ShoulderLeft, JointType.ElbowLeft),
+        new BoneBinding("Line_ShoulderRight_ElbowRight", JointType.ShoulderRight, JointType.ElbowRight),
+        new BoneBinding("Line_ElbowLeft_HandLeft", JointType.ElbowLeft, JointType.HandLeft),
+        new BoneBinding("Line_ElbowRight_HandRight", JointType.ElbowRight, JointType.HandRight),
+        new BoneBinding("Line_SpineBase_HipLeft", JointType.SpineBase, JointType.HipLeft),
+        new BoneBinding("Line_SpineBase_HipRight", JointType.SpineBase, JointType.HipRight),
+        new BoneBinding("Line_HipLeft_KneeLeft", JointType.HipLeft, JointType.KneeLeft),
+        new BoneBinding("Line_HipRight_KneeRight", JointType.HipRight, JointType.KneeRight),
+        new BoneBinding("Line_KneeLeft_AnkleLeft", JointType.KneeLeft, JointType.AnkleLeft),
+        new BoneBinding("Line_KneeRight_AnkleRight", JointType.KneeRight, JointType.AnkleRight),
+        new BoneBinding("Line_AnkleLeft_FootLeft", JointType.AnkleLeft, JointType.FootLeft),
+        new BoneBinding("Line_AnkleRight_FootRight", JointType.AnkleRight, JointType.FootRight)
+    };
+
+    private readonly Dictionary<string, KinectActor> m_Actors = new Dictionary<string, KinectActor>();
+    private readonly Dictionary<string, GameObject> m_AvatarRoots = new Dictionary<string, GameObject>();
+    public readonly Dictionary<string, Dictionary<string, GameObject>> joints =
+        new Dictionary<string, Dictionary<string, GameObject>>();
+    private readonly Dictionary<string, Dictionary<string, LineRenderer>> m_JointLines =
+        new Dictionary<string, Dictionary<string, LineRenderer>>();
+
+    public Vector3 mirrorPlanePoint = Vector3.zero;
     public Vector3 mirrorNormal = Vector3.forward;
     public GameObject handPrefab;
     public GameObject headPrefab;
     public GameObject bodyPrefab;
-
     public ParticleSystem particlePrefab;
     public AudioClip collisionSound;
 
-    /// <summary>
-    /// Actors are found by their Tag "Player" and name which is "Kinect Actor #id" (id is a unique long number).
-    /// If actor not already initialized add them to the HashSet.
-    /// If actor doesn't exist, delete it from the Hashset.
-    /// Update for each initialized and existing avatar the positions of the Bodyparts and lines.
-    /// </summary>
-    void Update()
-    {
-        GameObject[] foundActors = GameObject.FindGameObjectsWithTag("Player");
+    [Tooltip("Blendet die rohe KinectActor-Prefab-Visualisierung aus, damit nur der gespiegelte Corpus sichtbar ist.")]
+    public bool hideSourceActorRenderers = true;
+    [Tooltip("Nur für Debugging: zeigt den großen Corpus-Avatar im Raum. Im Spiel bleibt er unsichtbar; " +
+             "die Pose erscheint ausschließlich in der HUD-Vorschau unten rechts.")]
+    public bool showWorldAvatar = false;
 
-        foreach (GameObject actor in foundActors)
+    private KinectTracker m_Tracker;
+
+    private void Awake()
+    {
+        ResolveTracker();
+    }
+
+    private void Update()
+    {
+        ResolveTracker();
+        if (m_Tracker == null)
         {
-            if (actor == null || !actor.name.StartsWith("Kinect Actor #"))
-                continue;
+            return;
+        }
+
+        var currentActorIds = new HashSet<string>();
+        var trackedActors = m_Tracker.actors;
+
+        for (int i = 0; i < trackedActors.Count; i++)
+        {
+            var actor = trackedActors[i];
+            if (actor == null) continue;
 
             string actorId = actor.name;
+            currentActorIds.Add(actorId);
 
-            // Register new actor
-            if (!actors.ContainsKey(actorId))
+            if (!m_Actors.ContainsKey(actorId))
             {
-                actors[actorId] = actor;
-                initializedActors.Remove(actorId);
-                Debug.Log("Actor gefunden: " + actorId);
+                RegisterActor(actorId, actor);
             }
 
-            if (!initializedActors.Contains(actorId))
-            {
-                InitializeJoints(actorId, actor);
-                initializedActors.Add(actorId);
-            }
-
-            // Update for specific avatar
-            UpdateBodypartsAndLines(actorId);
+            UpdateAvatar(actorId, actor);
         }
 
-        // If actor not in the scene or tracked anymore, destroy the avatar
-        HashSet<string> currentActorIds = new HashSet<string>();
-
-        foreach (GameObject actor in foundActors)
-        {
-            if (actor != null && actor.name.StartsWith("Kinect Actor #"))
-            {
-                string actorId = actor.name;
-                currentActorIds.Add(actorId);
-            }
-        }
-        List<string> knownActorIds = new List<string>(actors.Keys);
+        var knownActorIds = new List<string>(m_Actors.Keys);
         foreach (string actorId in knownActorIds)
         {
             if (!currentActorIds.Contains(actorId))
             {
-                Debug.Log("Actor removed: " + actorId);
-
-                if (avatarRoots.ContainsKey(actorId))
-                {
-                    Destroy(avatarRoots[actorId]);
-                    avatarRoots.Remove(actorId);
-                }
-
-                // Remove from all dictionaries
-                actors.Remove(actorId);
-                joints.Remove(actorId);
-                jointLines.Remove(actorId);
-                initializedActors.Remove(actorId);
+                RemoveActor(actorId);
             }
         }
     }
 
-    /// <summary>
-    /// Assigns body parts by locating them through their hierarchy path.
-    /// </summary>
-    /// <param name="actorId">The unique id for the avatar.</param>
-    /// <param name="actor">The Kinect actor object.</param>
-    void InitializeJoints(string actorId, GameObject actor)
+    private void ResolveTracker()
     {
-        Dictionary<string, Transform> joints = new Dictionary<string, Transform>
+        if (m_Tracker == null)
         {
-            ["Head"] = actor.transform.Find("Spine Base/Spine Mid/Spine Shoulder/Neck/Head"),
-            ["Neck"] = actor.transform.Find("Spine Base/Spine Mid/Spine Shoulder/Neck"),
-            ["SpineBase"] = actor.transform.Find("Spine Base"),
-            ["SpineMid"] = actor.transform.Find("Spine Base/Spine Mid"),
-            ["HipLeft"] = actor.transform.Find("Spine Base/Hip Left"),
-            ["HipRight"] = actor.transform.Find("Spine Base/Hip Right"),
-            ["KneeLeft"] = actor.transform.Find("Spine Base/Hip Left/Knee Left"),
-            ["KneeRight"] = actor.transform.Find("Spine Base/Hip Right/Knee Right"),
-            ["AnkleLeft"] = actor.transform.Find("Spine Base/Hip Left/Knee Left/Ankle Left"),
-            ["AnkleRight"] = actor.transform.Find("Spine Base/Hip Right/Knee Right/Ankle Right"),
-            ["FootLeft"] = actor.transform.Find("Spine Base/Hip Left/Knee Left/Ankle Left/Foot Left"),
-            ["FootRight"] = actor.transform.Find("Spine Base/Hip Right/Knee Right/Ankle Right/Foot Right"),
-            ["ShoulderLeft"] = actor.transform.Find("Spine Base/Spine Mid/Spine Shoulder/Shoulder Left"),
-            ["ShoulderRight"] = actor.transform.Find("Spine Base/Spine Mid/Spine Shoulder/Shoulder Right"),
-            ["ElbowLeft"] = actor.transform.Find("Spine Base/Spine Mid/Spine Shoulder/Shoulder Left/Elbow Left"),
-            ["ElbowRight"] = actor.transform.Find("Spine Base/Spine Mid/Spine Shoulder/Shoulder Right/Elbow Right"),
-            ["HandLeft"] = actor.transform.Find("Spine Base/Spine Mid/Spine Shoulder/Shoulder Left/Elbow Left/Wrist Left/Hand Left"),
-            ["HandRight"] = actor.transform.Find("Spine Base/Spine Mid/Spine Shoulder/Shoulder Right/Elbow Right/Wrist Right/Hand Right"),
-        };
-
-        this.joints[actorId] = new Dictionary<string, GameObject>();
-        jointLines[actorId] = new Dictionary<string, LineRenderer>();
-
-        GameObject avatarRoot = new GameObject("Avatar_" + actorId);
-        avatarRoots[actorId] = avatarRoot;
-
-        foreach (var kvp in joints)
-        {
-            UpdateBodypart(actorId, kvp.Key, kvp.Value);
+            m_Tracker = FindObjectOfType<KinectTracker>(true);
         }
     }
 
-    /// <summary>
-    /// Updates positions of bodyparts and lines.
-    /// </summary>
-    void UpdateBodypartsAndLines(string actorId)
+    private void RegisterActor(string actorId, KinectActor actor)
     {
-        GameObject actor = actors[actorId];
+        m_Actors[actorId] = actor;
+        joints[actorId] = new Dictionary<string, GameObject>();
+        m_JointLines[actorId] = new Dictionary<string, LineRenderer>();
 
-        Transform Get(string path) => actor.transform.Find(path);
+        var avatarRoot = new GameObject("Avatar_" + actorId);
+        m_AvatarRoots[actorId] = avatarRoot;
 
-        Dictionary<string, Transform> joints = new Dictionary<string, Transform>
+        if (hideSourceActorRenderers)
         {
-            ["Head"] = Get("Spine Base/Spine Mid/Spine Shoulder/Neck/Head"),
-            ["Neck"] = Get("Spine Base/Spine Mid/Spine Shoulder/Neck"),
-            ["SpineBase"] = Get("Spine Base"),
-            ["SpineMid"] = Get("Spine Base/Spine Mid"),
-            ["HipLeft"] = Get("Spine Base/Hip Left"),
-            ["HipRight"] = Get("Spine Base/Hip Right"),
-            ["KneeLeft"] = Get("Spine Base/Hip Left/Knee Left"),
-            ["KneeRight"] = Get("Spine Base/Hip Right/Knee Right"),
-            ["AnkleLeft"] = Get("Spine Base/Hip Left/Knee Left/Ankle Left"),
-            ["AnkleRight"] = Get("Spine Base/Hip Right/Knee Right/Ankle Right"),
-            ["FootLeft"] = Get("Spine Base/Hip Left/Knee Left/Ankle Left/Foot Left"),
-            ["FootRight"] = Get("Spine Base/Hip Right/Knee Right/Ankle Right/Foot Right"),
-            ["ShoulderLeft"] = Get("Spine Base/Spine Mid/Spine Shoulder/Shoulder Left"),
-            ["ShoulderRight"] = Get("Spine Base/Spine Mid/Spine Shoulder/Shoulder Right"),
-            ["ElbowLeft"] = Get("Spine Base/Spine Mid/Spine Shoulder/Shoulder Left/Elbow Left"),
-            ["ElbowRight"] = Get("Spine Base/Spine Mid/Spine Shoulder/Shoulder Right/Elbow Right"),
-            ["HandLeft"] = Get("Spine Base/Spine Mid/Spine Shoulder/Shoulder Left/Elbow Left/Wrist Left/Hand Left"),
-            ["HandRight"] = Get("Spine Base/Spine Mid/Spine Shoulder/Shoulder Right/Elbow Right/Wrist Right/Hand Right")
-        };
-
-        foreach (var kvp in joints)
-        {
-            UpdateBodypart(actorId, kvp.Key, kvp.Value);
-        }
-
-        // Update lines
-        UpdateLine(actorId, "Line_Neck_Head", joints["Neck"], joints["Head"]);
-        UpdateLine(actorId, "Line_SpineMid_Neck", joints["SpineMid"], joints["Neck"]);
-        UpdateLine(actorId, "Line_SpineBase_SpineMid", joints["SpineBase"], joints["SpineMid"]);
-        UpdateLine(actorId, "Line_SpineMid_ShoulderLeft", joints["SpineMid"], joints["ShoulderLeft"]);
-        UpdateLine(actorId, "Line_SpineMid_ShoulderRight", joints["SpineMid"], joints["ShoulderRight"]);
-        UpdateLine(actorId, "Line_ShoulderLeft_ElbowLeft", joints["ShoulderLeft"], joints["ElbowLeft"]);
-        UpdateLine(actorId, "Line_ShoulderRight_ElbowRight", joints["ShoulderRight"], joints["ElbowRight"]);
-        UpdateLine(actorId, "Line_ElbowLeft_HandLeft", joints["ElbowLeft"], joints["HandLeft"]);
-        UpdateLine(actorId, "Line_ElbowRight_HandRight", joints["ElbowRight"], joints["HandRight"]);
-        UpdateLine(actorId, "Line_SpineBase_HipLeft", joints["SpineBase"], joints["HipLeft"]);
-        UpdateLine(actorId, "Line_SpineBase_HipRight", joints["SpineBase"], joints["HipRight"]);
-        UpdateLine(actorId, "Line_HipLeft_KneeLeft", joints["HipLeft"], joints["KneeLeft"]);
-        UpdateLine(actorId, "Line_HipRight_KneeRight", joints["HipRight"], joints["KneeRight"]);
-        UpdateLine(actorId, "Line_KneeLeft_AnkleLeft", joints["KneeLeft"], joints["AnkleLeft"]);
-        UpdateLine(actorId, "Line_KneeRight_AnkleRight", joints["KneeRight"], joints["AnkleRight"]);
-        UpdateLine(actorId, "Line_AnkleLeft_FootLeft", joints["AnkleLeft"], joints["FootLeft"]);
-        UpdateLine(actorId, "Line_AnkleRight_FootRight", joints["AnkleRight"], joints["FootRight"]);
-    }
-
-    /// <summary>
-    /// Updates or instantiates bodyparts.
-    /// </summary>
-    /// <param name="actorId">The unique id for the avatar.</param>
-    /// <param name="name">The name of the body part.</param>
-    /// <param name="joint">The specific bodypart.</param>
-    void UpdateBodypart(string actorId, string name, Transform joint)
-    {
-        if (joint == null) return;
-
-        var bodyParts = joints[actorId];
-        if (!bodyParts.ContainsKey(name))
-        {
-            GameObject bodypart;
-
-            if (name == "HandLeft" || name == "HandRight")
-                bodypart = Instantiate(handPrefab);
-            else if (name == "Head")
-                bodypart = Instantiate(headPrefab);
-            else
-                bodypart = Instantiate(bodyPrefab);
-
-            bodypart.name = name;
-            bodypart.transform.parent = avatarRoots[actorId].transform;
-
-            if (bodypart.GetComponent<Rigidbody>() == null)
-                bodypart.AddComponent<Rigidbody>();
-            if (bodypart.GetComponent<Collider>() == null)
-                bodypart.AddComponent<BoxCollider>();
-
-            BodyCollision bodyCollision = bodypart.AddComponent<BodyCollision>();
-            if (particlePrefab != null)
+            foreach (var renderer in actor.GetComponentsInChildren<Renderer>(true))
             {
-                bodyCollision.SetParticleEffect(particlePrefab);
-                bodyCollision.SetCollisionSound(collisionSound);
+                renderer.enabled = false;
+            }
+        }
+
+        Debug.Log("[Corpus in Speculo] Kinect-Aktor übernommen: " + actorId);
+    }
+
+    private void RemoveActor(string actorId)
+    {
+        if (m_AvatarRoots.TryGetValue(actorId, out var root) && root != null)
+        {
+            Destroy(root);
+        }
+
+        m_Actors.Remove(actorId);
+        m_AvatarRoots.Remove(actorId);
+        joints.Remove(actorId);
+        m_JointLines.Remove(actorId);
+    }
+
+    private void UpdateAvatar(string actorId, KinectActor actor)
+    {
+        foreach (var binding in JointBindings)
+        {
+            UpdateBodyPart(actorId, binding.name, actor.GetJoint(binding.type));
+        }
+
+        foreach (var bone in BoneBindings)
+        {
+            UpdateLine(actorId, bone.name, actor.GetJoint(bone.from), actor.GetJoint(bone.to));
+        }
+    }
+
+    private void UpdateBodyPart(string actorId, string partName, KinectJoint joint)
+    {
+        var bodyParts = joints[actorId];
+        if (joint.trackingState == TrackingState.NotTracked)
+        {
+            if (bodyParts.TryGetValue(partName, out var hidden) && hidden != null)
+            {
+                hidden.SetActive(false);
+            }
+            return;
+        }
+
+        if (!bodyParts.TryGetValue(partName, out var bodyPart) || bodyPart == null)
+        {
+            bodyPart = CreateBodyPart(partName);
+            bodyPart.transform.SetParent(m_AvatarRoots[actorId].transform, true);
+            bodyParts[partName] = bodyPart;
+        }
+
+        if (!bodyPart.activeSelf) bodyPart.SetActive(true);
+        bodyPart.transform.position = MirrorJoint(joint.position);
+    }
+
+    private GameObject CreateBodyPart(string partName)
+    {
+        GameObject prefab = partName == "HandLeft" || partName == "HandRight"
+            ? handPrefab
+            : partName == "Head" ? headPrefab : bodyPrefab;
+
+        GameObject bodyPart;
+        if (prefab != null)
+        {
+            bodyPart = Instantiate(prefab);
+        }
+        else
+        {
+            bodyPart = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            bodyPart.transform.localScale = Vector3.one * 0.12f;
+            Debug.LogWarning("[Corpus in Speculo] Prefab für " + partName + " fehlt; nutze Kugel-Fallback.");
+        }
+
+        bodyPart.name = partName;
+
+        // Die Körperteile bleiben als unsichtbare Tracking-/Kollisionspunkte aktiv.
+        // Die einzige sichtbare Darstellung der Pose zeichnet SkeletonPreviewGraphic
+        // unten rechts aus genau diesen Transform-Positionen.
+        foreach (var renderer in bodyPart.GetComponentsInChildren<Renderer>(true))
+        {
+            renderer.enabled = showWorldAvatar;
+        }
+
+        bool hasUsableCollider = false;
+        foreach (var collider in bodyPart.GetComponents<Collider>())
+        {
+            if (collider is MeshCollider meshCollider && meshCollider.sharedMesh == null)
+            {
+                meshCollider.enabled = false;
+                continue;
             }
 
-            bodyParts[name] = bodypart;
+            collider.isTrigger = false;
+            hasUsableCollider |= collider.enabled;
         }
 
-        Vector3 mirroredPosition = MirrorJoint(joint.position, mirrorPlanePoint, mirrorNormal);
-        bodyParts[name].transform.position = mirroredPosition;
-    }
-
-    /// <summary>
-    /// Visualization between joints, updates start and end position of line or instatiated depending if actor or joints and lines are already instantiated.
-    /// </summary>
-    /// <param name="actorId">The unique id for the avatar.</param>
-    /// <param name="name">The name of the body part.</param>
-    /// <param name="jointA">The first body part to be connected with jointB.</param>
-    /// <param name="jointB">The second body part to be connected with jointA.</param>
-
-    void UpdateLine(string actorId, string name, Transform jointA, Transform jointB)
-    {
-        if (jointA == null || jointB == null) return;
-
-        var lines = jointLines[actorId];
-        if (!lines.ContainsKey(name))
+        if (!hasUsableCollider)
         {
-            GameObject lineObj = new GameObject(name);
-            LineRenderer lr = lineObj.AddComponent<LineRenderer>();
-
-            lineObj.transform.parent = avatarRoots[actorId].transform;
-
-            lr.material = new Material(Shader.Find("Sprites/Default"));
-            Color silver = new Color(0.75f, 0.75f, 0.75f);
-            lr.startColor = silver;
-            lr.endColor = silver;
-            lr.startWidth = 0.02f;
-            lr.endWidth = 0.02f;
-            lr.positionCount = 2;
-            lines[name] = lr;
+            bodyPart.AddComponent<SphereCollider>().radius = 0.5f;
         }
-        Vector3 mirroredA = MirrorJoint(jointA.position, mirrorPlanePoint, mirrorNormal);
-        Vector3 mirroredB = MirrorJoint(jointB.position, mirrorPlanePoint, mirrorNormal);
-        lines[name].SetPosition(0, mirroredA);
-        lines[name].SetPosition(1, mirroredB);
+
+        var rigidbody = bodyPart.GetComponent<Rigidbody>();
+        if (rigidbody == null) rigidbody = bodyPart.AddComponent<Rigidbody>();
+        rigidbody.isKinematic = true;
+        rigidbody.useGravity = false;
+        rigidbody.detectCollisions = true;
+        rigidbody.interpolation = RigidbodyInterpolation.Interpolate;
+        rigidbody.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
+
+        if (bodyPart.GetComponent<CaveGame.PlayerBodyPart>() == null)
+        {
+            bodyPart.AddComponent<CaveGame.PlayerBodyPart>();
+        }
+
+        int playerLayer = LayerMask.NameToLayer("Player");
+        if (playerLayer >= 0) bodyPart.layer = playerLayer;
+
+        var bodyCollision = bodyPart.GetComponent<BodyCollision>();
+        if (bodyCollision == null) bodyCollision = bodyPart.AddComponent<BodyCollision>();
+        if (particlePrefab != null)
+        {
+            bodyCollision.SetParticleEffect(particlePrefab);
+            bodyCollision.SetCollisionSound(collisionSound);
+        }
+
+        return bodyPart;
     }
-    /// <summary>
-    /// Mirrors a given point in relation to given plane and its normal.
-    /// </summary>
-    /// <param name="point">Point to be mirrored (body part position).</param>
-    /// <param name="planePoint">Point on a plane as a reference for mirroring.</param>
-    /// <param name="planeNormal">The normal of the plane. </param>
-    /// <returns></returns>
-    /// 
-    Vector3 MirrorJoint(Vector3 point, Vector3 planePoint, Vector3 planeNormal)
+
+    private void UpdateLine(string actorId, string lineName, KinectJoint from, KinectJoint to)
     {
-        Vector3 n = planeNormal.normalized;
-        Vector3 toPoint = point - planePoint;
-        float projection = Vector3.Dot(toPoint, n);
-        Vector3 mirrored = point - 2 * projection * n;
-        return mirrored;
+        var lines = m_JointLines[actorId];
+        if (!lines.TryGetValue(lineName, out var line) || line == null)
+        {
+            var lineObject = new GameObject(lineName);
+            lineObject.transform.SetParent(m_AvatarRoots[actorId].transform, false);
+            line = lineObject.AddComponent<LineRenderer>();
+            line.material = new Material(Shader.Find("Sprites/Default"));
+            line.startColor = new Color(0.75f, 0.75f, 0.75f);
+            line.endColor = line.startColor;
+            line.startWidth = 0.025f;
+            line.endWidth = 0.025f;
+            line.positionCount = 2;
+            line.useWorldSpace = true;
+            lines[lineName] = line;
+        }
+
+        bool tracked = from.trackingState != TrackingState.NotTracked &&
+                       to.trackingState != TrackingState.NotTracked;
+        line.enabled = showWorldAvatar && tracked;
+        if (!tracked) return;
+
+        line.SetPosition(0, MirrorJoint(from.position));
+        line.SetPosition(1, MirrorJoint(to.position));
+    }
+
+    private Vector3 MirrorJoint(Vector3 point)
+    {
+        Vector3 normal = mirrorNormal.sqrMagnitude > 0.0001f
+            ? mirrorNormal.normalized
+            : Vector3.forward;
+        float projection = Vector3.Dot(point - mirrorPlanePoint, normal);
+        return point - 2f * projection * normal;
     }
 }
