@@ -200,13 +200,22 @@ einen mittigen Startknopf ein (bei Game Over zwei Knöpfe: Neustart / Menü). Ro
 stabil“, Grün = „startbereit“.
 
 **Auslösung (robust):** Statt eines winzigen, schwer zu treffenden Trigger-Cubes wird **distanzbasiert
-mit kurzem Halten** ausgelöst. Die getrackte (unsichtbare) Hand muss nur in die Nähe des Knopfes kommen
-(`activationRadius`, Standard 0.22 m) und dort kurz bleiben (`holdTime`, Standard 0.5 s). Der Knopf
-füllt sich dabei sichtbar von Grün → Druckfarbe und löst dann `GameManager.RequestStart()` aus. Das ist
-unempfindlich gegen Tracking-Jitter und gegen versehentliches Vorbeiwischen.
+mit kurzem Halten** ausgelöst. Die Erkennungszone ist ein **Zylinder über dem Knopf**: seitlich
+`activationRadius` (Standard 0.30 m), nach oben großzügig `verticalTolerance` (Standard 0.45 m) –
+die Hand schwebt naturgemäß *über* dem Knopf. Geprüft werden **beide** getrackten Hände (unabhängig
+geglättet), nicht mehr nur eine flatternde „aktive“ Handauswahl. Kurz halten (`holdTime`,
+Standard 0.35 s), dann löst der Knopf aus. Der Knopf füllt sich dabei sichtbar von Grün → Druckfarbe
+und **wächst** leicht mit dem Fortschritt.
+
+Gegen Tracking-Zittern gibt es zwei Sicherungen:
+- **Hysterese** (`holdZoneScale`, Standard 1.4): Während des Haltens wächst die Zone – kleines
+  Zittern bricht den Fortschritt nicht ab. Der gehaltene Knopf gewinnt außerdem knappe Duelle
+  gegen den Nachbarknopf (Game Over), damit der Fortschritt nicht ständig zurückspringt.
+- **Aussetzer-Gnadenfrist** (`dropoutGrace`, Standard 0.5 s): Verliert die Kinect die Hand kurz,
+  friert der Fortschritt ein, statt sich zu entleeren.
 
 **Falls der Knopf weiterhin schwer erreichbar ist** („etwas weiter nach vorne“):
-- `activationRadius` am `PhysicalStartPodestController` erhöhen (z. B. 0.3) – verzeiht mehr Ungenauigkeit.
+- `activationRadius` / `verticalTolerance` am `PhysicalStartPodestController` weiter erhöhen.
 - Oder das **Podest** in der Szene näher zur Spielerposition / weiter nach vorne (Z) schieben; der
   Knopf folgt dem Podest. (Die Hand bewegt sich im gespiegelten Avatar-Raum – der Knopf muss dort
   liegen, wo die sichtbare Avatar-Hand hinreicht.)

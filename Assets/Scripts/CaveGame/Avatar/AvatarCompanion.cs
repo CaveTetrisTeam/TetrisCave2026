@@ -27,9 +27,11 @@ namespace CaveGame
         public float modelHeight = 0.9f;
         [Tooltip("Zusätzliche Y-Drehung, falls das Modell nicht zum Spieler schaut.")]
         public float modelYawOffset = 0f;
-        [Tooltip("Diese FBX-Kindobjekte werden ausgeblendet: die im Modell eingebaute " +
-                 "Sprechblase ('Text') sowie Blender-Kamera/-Licht.")]
-        public string[] hiddenChildNames = { "Text", "Camera", "Light" };
+        [Tooltip("Kindobjekte, deren Name einen dieser Teile enthält, werden ausgeblendet: " +
+                 "die im FBX eingebaute Sprechblase ('BézierCircle' + 'Text') sowie " +
+                 "Blender-Kamera/-Licht. ('zierCircle' statt 'BézierCircle', damit der " +
+                 "Vergleich unabhängig von der é-Kodierung funktioniert.)")]
+        public string[] hiddenChildNames = { "Text", "zierCircle", "Camera", "Light" };
         [Tooltip("Nur Animations-Clips abspielen, deren Name diesen Teil enthält (leer = alle).")]
         public string animationClipFilter = "";
 
@@ -157,13 +159,15 @@ namespace CaveGame
             m_Model = Instantiate(prefab, transform);
             m_Model.name = "Avatar Modell";
 
-            // Eingebaute Sprechblase ('Text') und Blender-Kamera/-Licht ausblenden –
-            // die dynamische Sprechblase übernimmt.
+            // Eingebaute Sprechblase ('BézierCircle' + 'Text') und Blender-Kamera/-Licht
+            // ausblenden – die dynamische Sprechblase übernimmt. (Der Import-
+            // Postprocessor entfernt sie zusätzlich schon aus dem Asset; das hier
+            // ist das Sicherheitsnetz für alte Library-Caches.)
             foreach (var child in m_Model.GetComponentsInChildren<Transform>(true))
             {
                 foreach (var hidden in hiddenChildNames)
                 {
-                    if (child.name == hidden || child.name.StartsWith(hidden + "."))
+                    if (child.name.Contains(hidden))
                     {
                         child.gameObject.SetActive(false);
                         break;
@@ -226,16 +230,26 @@ namespace CaveGame
                 return;
             }
 
-            var clips = new List<AnimationClip>();
+            var imported = new List<AnimationClip>();
             foreach (var clip in Resources.LoadAll<AnimationClip>(modelResourcePath))
             {
                 if (clip == null || clip.name.StartsWith("__preview__"))
                 {
                     continue; // Editor-interne Vorschau-Clips überspringen
                 }
+                imported.Add(clip);
+            }
+
+            var clips = new List<AnimationClip>();
+            foreach (var clip in imported)
+            {
                 if (clip.empty)
                 {
                     continue; // Clips ohne Kurven (z. B. 'Body|CubeAction' mit 0 Frames)
+                }
+                if (IsForeignActionCopy(clip.name, imported))
+                {
+                    continue; // z. B. 'Body|MouthAction' – verzerrt das ganze Modell
                 }
                 if (!string.IsNullOrEmpty(animationClipFilter) &&
                     clip.name.IndexOf(animationClipFilter, System.StringComparison.OrdinalIgnoreCase) < 0)
@@ -280,6 +294,46 @@ namespace CaveGame
 
             output.SetSourcePlayable(mixer);
             m_Graph.Play();
+        }
+
+        /// <summary>
+        /// Blender exportiert eine Aktion pro Objekt als eigenen Take "Objekt|Aktion" –
+        /// auch auf Objekte, denen die Aktion gar nicht gehört. Solche Fremd-Kopien
+        /// (z. B. 'Body|MouthAction': Mund-Kurven auf dem Körper) reißen das Modell
+        /// auseinander. Behalten wird nur die Variante, deren Objektname zur Aktion
+        /// passt ('Mouth|MouthAction') – sofern es eine solche Variante gibt.
+        /// </summary>
+        private static bool IsForeignActionCopy(string clipName, List<AnimationClip> allClips)
+        {
+            int bar = clipName.IndexOf('|');
+            if (bar <= 0)
+            {
+                return false;
+            }
+
+            string objectName = clipName.Substring(0, bar);
+            string actionName = clipName.Substring(bar + 1);
+            if (actionName.StartsWith(objectName))
+            {
+                return false; // eigene Aktion des Objekts
+            }
+
+            foreach (var other in allClips)
+            {
+                string otherName = other.name;
+                int otherBar = otherName.IndexOf('|');
+                if (otherBar <= 0)
+                {
+                    continue;
+                }
+                if (otherName.Substring(otherBar + 1) == actionName &&
+                    actionName.StartsWith(otherName.Substring(0, otherBar)))
+                {
+                    return true; // die passende Objekt-Variante existiert -> Kopie verwerfen
+                }
+            }
+
+            return false;
         }
 
         private void SetupBubble()

@@ -35,10 +35,23 @@ namespace CaveGame
         /// <summary>Der unsichtbare Interaktionspunkt (Transform mit Collider).</summary>
         public Transform InteractionPoint { get; private set; }
 
+        // Beide Hände einzeln (unabhängig geglättet) – so kann z. B. der Podest-Knopf
+        // auf JEDE Hand reagieren, statt auf eine flatternde "aktive" Handauswahl.
+        /// <summary>Linke Hand aktuell getrackt?</summary>
+        public bool HasLeftHand { get; private set; }
+        /// <summary>Rechte Hand aktuell getrackt?</summary>
+        public bool HasRightHand { get; private set; }
+        /// <summary>Geglättete Weltposition der linken Hand (nur gültig bei <see cref="HasLeftHand"/>).</summary>
+        public Vector3 LeftHandPosition { get; private set; }
+        /// <summary>Geglättete Weltposition der rechten Hand (nur gültig bei <see cref="HasRightHand"/>).</summary>
+        public Vector3 RightHandPosition { get; private set; }
+
         private KinectPlayerPresence m_Presence;
         private PositionTransferMultiple m_AvatarTracker;
-        private Vector3 m_Smoothed;
-        private bool m_HasSmoothed;
+        private Vector3 m_SmoothedLeft;
+        private Vector3 m_SmoothedRight;
+        private bool m_HasSmoothedLeft;
+        private bool m_HasSmoothedRight;
 
         private static readonly Vector3 ParkedPosition = new Vector3(0f, -1000f, 0f);
 
@@ -69,52 +82,84 @@ namespace CaveGame
 
         private void Update()
         {
-            if (TryResolveHand(out var rawPosition))
+            ResolveHands(out var leftRaw, out bool leftTracked, out var rightRaw, out bool rightTracked);
+
+            HasLeftHand = SmoothHand(leftTracked, leftRaw + calibrationOffset,
+                                     ref m_SmoothedLeft, ref m_HasSmoothedLeft);
+            HasRightHand = SmoothHand(rightTracked, rightRaw + calibrationOffset,
+                                      ref m_SmoothedRight, ref m_HasSmoothedRight);
+            LeftHandPosition = m_SmoothedLeft;
+            RightHandPosition = m_SmoothedRight;
+
+            // Kompatibilität: zusätzlich weiterhin EINE "aktive" Hand bestimmen.
+            if (HasLeftHand || HasRightHand)
             {
-                rawPosition += calibrationOffset;
-
-                if (!m_HasSmoothed || positionSmoothingTime <= 0f)
-                {
-                    m_Smoothed = rawPosition;
-                    m_HasSmoothed = true;
-                }
-                else
-                {
-                    float t = 1f - Mathf.Exp(-Time.unscaledDeltaTime / positionSmoothingTime);
-                    m_Smoothed = Vector3.Lerp(m_Smoothed, rawPosition, t);
-                }
-
                 HasHand = true;
-                HandPosition = m_Smoothed;
-                InteractionPoint.position = m_Smoothed;
+                HandPosition = ChooseHand(m_SmoothedLeft, HasLeftHand, m_SmoothedRight, HasRightHand);
+                InteractionPoint.position = HandPosition;
             }
             else
             {
                 HasHand = false;
                 ActiveHand = TrackedHand.None;
-                m_HasSmoothed = false;
                 InteractionPoint.position = ParkedPosition;
             }
         }
 
-        private bool TryResolveHand(out Vector3 position)
+        /// <summary>Glättet eine Handposition; bei Tracking-Verlust wird die Glättung zurückgesetzt.</summary>
+        private bool SmoothHand(bool tracked, Vector3 raw, ref Vector3 smoothed, ref bool hasSmoothed)
         {
-            // 1) Gespiegelter Avatar (deckt sich mit dem, was der Spieler sieht).
-            if (TryResolveFromAvatar(out position))
+            if (!tracked)
             {
-                return true;
+                hasSmoothed = false;
+                return false;
+            }
+
+            if (!hasSmoothed || positionSmoothingTime <= 0f)
+            {
+                smoothed = raw;
+                hasSmoothed = true;
+            }
+            else
+            {
+                float t = 1f - Mathf.Exp(-Time.unscaledDeltaTime / positionSmoothingTime);
+                smoothed = Vector3.Lerp(smoothed, raw, t);
+            }
+
+            return true;
+        }
+
+        private void ResolveHands(out Vector3 left, out bool leftTracked,
+                                  out Vector3 right, out bool rightTracked)
+        {
+            left = right = default;
+            leftTracked = rightTracked = false;
+
+            // 1) Gespiegelter Avatar (deckt sich mit dem, was der Spieler sieht).
+            if (TryGetAvatarParts(out var parts))
+            {
+                if (parts.TryGetValue("HandLeft", out var leftGo) && leftGo != null)
+                {
+                    left = leftGo.transform.position;
+                    leftTracked = true;
+                }
+                if (parts.TryGetValue("HandRight", out var rightGo) && rightGo != null)
+                {
+                    right = rightGo.transform.position;
+                    rightTracked = true;
+                }
+
+                if (leftTracked || rightTracked)
+                {
+                    return;
+                }
             }
 
             // 2) Fallback: rohe Kinect-Gelenke.
-            if (m_Presence != null &&
-                m_Presence.TryGetHandPositions(out var left, out var leftTracked, out var right, out var rightTracked))
+            if (m_Presence != null)
             {
-                position = ChooseHand(left, leftTracked, right, rightTracked);
-                return true;
+                m_Presence.TryGetHandPositions(out left, out leftTracked, out right, out rightTracked);
             }
-
-            position = default;
-            return false;
         }
 
         /// <summary>
@@ -167,29 +212,6 @@ namespace CaveGame
             }
 
             return false;
-        }
-
-        private bool TryResolveFromAvatar(out Vector3 position)
-        {
-            position = default;
-
-            if (!TryGetAvatarParts(out var parts))
-            {
-                return false;
-            }
-
-            bool leftTracked = parts.TryGetValue("HandLeft", out var leftGo) && leftGo != null;
-            bool rightTracked = parts.TryGetValue("HandRight", out var rightGo) && rightGo != null;
-
-            if (!leftTracked && !rightTracked)
-            {
-                return false;
-            }
-
-            var left = leftTracked ? leftGo.transform.position : Vector3.zero;
-            var right = rightTracked ? rightGo.transform.position : Vector3.zero;
-            position = ChooseHand(left, leftTracked, right, rightTracked);
-            return true;
         }
 
         private Vector3 ChooseHand(Vector3 left, bool leftTracked, Vector3 right, bool rightTracked)
