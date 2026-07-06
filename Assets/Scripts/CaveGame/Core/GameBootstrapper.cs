@@ -25,6 +25,7 @@ namespace CaveGame
             ConfigureMonoCaveProjection();
             EnsureWallSpawner();
             EnsureUi();
+            EnsureCompanionAvatar();
             RemoveSampleToggleButtons();
             // Sprachsteuerung vorerst deaktiviert (kein Spielstart per Stimme).
             // Zum Reaktivieren einfach die beiden folgenden Aufrufe wieder einkommentieren:
@@ -109,6 +110,21 @@ namespace CaveGame
                 var go = new GameObject("Game Over UI");
                 go.AddComponent<GameOverController>();
             }
+        }
+
+        /// <summary>
+        /// Erzeugt den Begleiter-Avatar (schwebendes Blender-Modell mit Sprechblasen),
+        /// der das Spielprinzip erklärt und die Runde kommentiert.
+        /// </summary>
+        private static void EnsureCompanionAvatar()
+        {
+            if (Object.FindObjectOfType<AvatarCompanion>(true) != null)
+            {
+                return;
+            }
+
+            var go = new GameObject("Companion Avatar");
+            go.AddComponent<AvatarCompanion>();
         }
 
         /// <summary>

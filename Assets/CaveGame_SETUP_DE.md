@@ -278,6 +278,37 @@ dafür größer (~488 MB) und etwas langsamer. Die Konfiguration zeigt bereits a
 
 ---
 
+## 7d. Begleiter-Avatar (Blocky)
+
+Der animierte Blender-Avatar (`Assets/TetrisCave/Models/Resources/Avatar/tetris01.fbx`)
+wird vom `GameBootstrapper` automatisch als **Companion Avatar** in die Szene gelegt –
+kein manueller Schritt nötig.
+
+Was er tut:
+
+- **Menü (erster Besuch):** erklärt das Spielprinzip Schritt für Schritt per Sprechblasen,
+  danach erinnert er regelmäßig an den Podest-Knopf.
+- **Während der Runde:** schwirrt frei in der Umgebung umher (Bereich `wanderCenter`/
+  `wanderExtents` im Inspector) und kommentiert jede Wand: Lob bei Erfolg, Serien-Sprüche
+  ab 3 Wänden in Folge, Trost bei Treffern, Warnung beim letzten Leben.
+- **Game Over:** kommentiert Punktzahl bzw. neuen Rekord und nennt die Knopf-Belegung.
+
+Technik/Anpassung:
+
+- Skripte: `Assets/Scripts/CaveGame/Avatar/` (`AvatarCompanion` = Logik & Texte,
+  `AvatarHoverMovement` = Schwebeflug, `AvatarSpeechBubble` = Sprechblase).
+  **Alle Texte und Positionen sind am `Companion Avatar`-Objekt im Inspector änderbar.**
+- Die Animation aus dem FBX wird per Playables abgespielt (kein AnimatorController-Asset);
+  ein `AssetPostprocessor` (`Assets/Editor/AvatarModelImportSettings.cs`) stellt die Clips
+  beim Import automatisch auf **Loop** und lässt Blender-Kamera/-Licht weg.
+- Die im FBX **einmodellierte Sprechblase** (Mesh `Text`, „Welche Form kam zuletzt?“)
+  wird zur Laufzeit ausgeblendet – Texte kommen ausschließlich aus der dynamischen
+  Sprechblase. Falls das Modell falsch herum schaut: `modelYawOffset` anpassen.
+- Das Modell erhält keine Collider und liegt nicht auf dem Player-Layer – es kann
+  also niemals Wand-Treffer auslösen.
+
+---
+
 ## 8. Spielablauf / Zustände (`GameManager`)
 
 `MainMenu` → (Startknopf oder UI/Tastatur) → `WaitingForPlayerTracking` →
