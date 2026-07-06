@@ -328,6 +328,25 @@ Technik/Anpassung:
 
 ---
 
+## 7e. Soundeffekte (Fehler / Game Over)
+
+`Wall.errorSound` und `GameManager.gameOverSound` sind Inspector-Felder – aber GameManager und
+Wände werden **zur Laufzeit** erzeugt, daher füllt der `GameBootstrapper` bzw. `WallSpawner` die
+Felder automatisch aus `Resources`:
+
+- **Fehler-Sound** (Wandberührung): `Assets/TetrisCave/Sounds/Resources/Sfx/FalseSound.mp3`
+- **Game-Over-Sound**: `Assets/TetrisCave/Sounds/Resources/Sfx/GameOverSound.mp3`
+  (ehemals „Game Over #2 (Super Mario)…“ aus dem Sounds-Ordner; per `git mv` samt .meta
+  verschoben, Referenzen bleiben gültig)
+
+**Sound tauschen:** einfach die MP3 in `Resources/Sfx/` durch eine gleichnamige Datei ersetzen –
+oder am `WallSpawner` (`errorSound`) manuell einen anderen Clip zuweisen. Abgespielt wird über
+die AudioSource des GameManagers (`PlayOneShot`), damit der Ton beim Despawnen der Wand nicht
+abreißt und laufende Musik nicht unterbrochen wird. Die übrigen Musik-Dateien liegen unverändert
+in `Assets/Samples/CAVE/1.1.1/CAVE Tools/Sounds/`.
+
+---
+
 ## 8. Spielablauf / Zustände (`GameManager`)
 
 `MainMenu` → (Startknopf oder UI/Tastatur) → `WaitingForPlayerTracking` →

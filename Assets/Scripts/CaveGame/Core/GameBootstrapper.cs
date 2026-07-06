@@ -24,6 +24,7 @@ namespace CaveGame
             EnsureKinect();
             ConfigureMonoCaveProjection();
             EnsureWallSpawner();
+            EnsureGameAudio();
             EnsureUi();
             EnsureCompanionAvatar();
             RemoveSampleToggleButtons();
@@ -109,6 +110,26 @@ namespace CaveGame
             {
                 var go = new GameObject("Game Over UI");
                 go.AddComponent<GameOverController>();
+            }
+        }
+
+        /// <summary>
+        /// Verdrahtet die Soundeffekte: Da GameManager und Wände zur Laufzeit erzeugt
+        /// werden, können die AudioClip-Felder nicht im Inspector gesetzt werden –
+        /// die Clips kommen deshalb aus <c>Resources/Sfx</c>. Der Fehler-Sound wird
+        /// vom <see cref="WallSpawner"/> an jede Wand weitergereicht.
+        /// </summary>
+        private static void EnsureGameAudio()
+        {
+            var manager = Object.FindObjectOfType<GameManager>(true);
+            if (manager != null && manager.gameOverSound == null)
+            {
+                manager.gameOverSound = Resources.Load<AudioClip>("Sfx/GameOverSound");
+                if (manager.gameOverSound == null)
+                {
+                    Debug.LogWarning("[GameBootstrapper] Game-Over-Sound 'Resources/Sfx/GameOverSound' " +
+                                     "nicht gefunden – Game Over bleibt stumm.");
+                }
             }
         }
 

@@ -20,6 +20,10 @@ namespace CaveGame
         [Tooltip("Resources-Unterordner mit den Wand-PNGs (als Texture2D geladen).")]
         public string resourcesFolder = "Walls";
 
+        [Header("Audio")]
+        [Tooltip("Fehler-Sound bei Wandberührung. Leer = automatisch aus Resources/Sfx/FalseSound laden.")]
+        public AudioClip errorSound;
+
         [Header("Platzierung (Weltkoordinaten)")]
         [Tooltip("Z-Position, an der Wände erscheinen (weit vorne).")]
         public float spawnZ = 40f;
@@ -91,6 +95,15 @@ namespace CaveGame
         private void Awake()
         {
             EnsureSprites();
+            if (errorSound == null)
+            {
+                errorSound = Resources.Load<AudioClip>("Sfx/FalseSound");
+                if (errorSound == null)
+                {
+                    Debug.LogWarning("[WallSpawner] Fehler-Sound 'Resources/Sfx/FalseSound' nicht " +
+                                     "gefunden – Wandtreffer bleiben stumm.");
+                }
+            }
             m_PlayerPresence = FindObjectOfType<KinectPlayerPresence>(true);
             CalibrateForCurrentPlayer();
         }
@@ -229,7 +242,16 @@ namespace CaveGame
             body.interpolation = RigidbodyInterpolation.Interpolate;
             body.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
 
-            go.AddComponent<Wall>();
+            // Fehler-Sound verdrahten: Der Clip kommt aus Resources, abgespielt wird
+            // über die AudioSource des (unzerstörbaren) GameManagers – so wird der
+            // Ton nicht abgeschnitten, wenn die Wand kurz danach despawnt.
+            var wallComponent = go.AddComponent<Wall>();
+            wallComponent.errorSound = errorSound;
+            // Voll qualifiziert, weil Windows.Kinect ebenfalls eine AudioSource definiert.
+            wallComponent.globalAudioSource = GameManager.Instance != null
+                ? GameManager.Instance.GetComponent<UnityEngine.AudioSource>()
+                : null;
+
             var hitZone = go.AddComponent<WallHitZone>();
             hitZone.playerLayers = playerLayers;
 
