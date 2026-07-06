@@ -217,6 +217,11 @@ Gegen Tracking-Zittern gibt es zwei Sicherungen:
 Zu empfindlich (löst versehentlich aus)? → `activationRadius`/`verticalTolerance` verkleinern oder
 `holdTime` erhöhen. Zu schwergängig? → umgekehrt.
 
+**Neustart/Menü (Game Over) sind bewusst strenger** als der Start-Knopf, weil der Spieler dort
+noch in Bewegung direkt am Podest steht und die zwei Zonen sonst überlappen:
+`gameOverZoneScale` (Standard 0.75 = engere Zone), `gameOverHoldTime` (Standard 0.8 s) und
+`gameOverAppearGrace` (Standard 1.2 s Sperre nach dem Einblenden, bis die Arme zur Ruhe kommen).
+
 **Falls der Knopf weiterhin schwer erreichbar ist** („etwas weiter nach vorne“):
 - `activationRadius` / `verticalTolerance` am `PhysicalStartPodestController` weiter erhöhen.
 - Oder das **Podest** in der Szene näher zur Spielerposition / weiter nach vorne (Z) schieben; der

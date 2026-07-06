@@ -43,6 +43,18 @@ namespace CaveGame
                  "damit Neustart/Menü trotz großem Auslöse-Radius unterscheidbar sind.")]
         public float gameOverButtonSeparation = 0.26f;
 
+        [Header("Game-Over-Knöpfe (strenger als der Start-Knopf)")]
+        [Tooltip("Verkleinert die Erkennungszone von Neustart/Menü relativ zum Start-Knopf " +
+                 "(0.75 = 75 % von activationRadius/verticalTolerance). Die Zonen der beiden " +
+                 "Knöpfe überlappen sonst und reagieren auf jede Hand in Podestnähe.")]
+        public float gameOverZoneScale = 0.75f;
+        [Tooltip("Haltezeit (Sek.) für Neustart/Menü – bewusst länger, weil der Spieler bei " +
+                 "Game Over noch in Bewegung direkt am Podest steht.")]
+        public float gameOverHoldTime = 0.8f;
+        [Tooltip("Einblende-Sperre (Sek.) speziell nach Game Over: solange reagieren die " +
+                 "Knöpfe nicht, damit die noch schwingenden Arme nichts auslösen.")]
+        public float gameOverAppearGrace = 1.2f;
+
         [Header("Farben")]
         public Color waitingColor = new Color(0.85f, 0.16f, 0.10f);
         public Color readyColor = new Color(0.15f, 0.85f, 0.35f);
@@ -108,9 +120,10 @@ namespace CaveGame
             bool ready = !requireReliableTracking || (m_Presence != null && m_Presence.HasReliablePlayer);
 
             // Grundvoraussetzungen (unabhängig vom Tracking-Aussetzer).
+            float appearGrace = state == GameState.GameOver ? gameOverAppearGrace : appearGracePeriod;
             bool gateOpen = manager != null && ready &&
                             Time.unscaledTime - m_LastActivation >= cooldown &&
-                            Time.unscaledTime - m_ButtonShownAt >= appearGracePeriod;
+                            Time.unscaledTime - m_ButtonShownAt >= appearGrace;
 
             // Welcher aktive Knopf liegt aktuell unter einer der beiden Hände?
             PodestAction candidate = default;
@@ -119,7 +132,8 @@ namespace CaveGame
                                 TryGetTargetAction(state, out candidate);
 
             float dt = Time.unscaledDeltaTime;
-            float fill = 1f / Mathf.Max(0.05f, holdTime);
+            float effectiveHoldTime = state == GameState.GameOver ? gameOverHoldTime : holdTime;
+            float fill = 1f / Mathf.Max(0.05f, effectiveHoldTime);
 
             if (hasCandidate)
             {
@@ -190,6 +204,12 @@ namespace CaveGame
 
             bool isHeld = m_HasHeld && m_HeldAction.Equals(candidate);
             float zoneScale = isHeld ? Mathf.Max(1f, holdZoneScale) : 1f;
+
+            // Neustart/Menü bekommen eine engere Zone als der Start-Knopf.
+            if (candidate != PodestAction.Start)
+            {
+                zoneScale *= Mathf.Clamp(gameOverZoneScale, 0.2f, 1f);
+            }
 
             float nearest = float.MaxValue;
             if (m_Interactor.HasLeftHand)
