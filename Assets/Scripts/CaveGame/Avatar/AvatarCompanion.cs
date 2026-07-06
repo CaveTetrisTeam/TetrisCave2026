@@ -41,13 +41,18 @@ namespace CaveGame
 
         [Header("Ankerpunkte (Weltkoordinaten, Spieler steht im Ursprung)")]
         [Tooltip("Schwebeposition im Menü und bei der Erklärung.")]
-        public Vector3 menuAnchor = new Vector3(1.0f, 1.2f, 2.6f);
+        public Vector3 menuAnchor = new Vector3(1.0f, 0.9f, 2.6f);
         [Tooltip("Schwebeposition beim Game-Over-Kommentar.")]
-        public Vector3 gameOverAnchor = new Vector3(-1.0f, 1.2f, 2.6f);
-        [Tooltip("Mittelpunkt des Bereichs, in dem der Avatar während des Spiels umherschwirrt.")]
-        public Vector3 wanderCenter = new Vector3(0f, 2.4f, 4.0f);
-        [Tooltip("Halbe Ausdehnung des Schwirr-Bereichs.")]
-        public Vector3 wanderExtents = new Vector3(2.4f, 0.7f, 1.5f);
+        public Vector3 gameOverAnchor = new Vector3(-1.0f, 0.9f, 2.6f);
+        [Tooltip("Mittelpunkt des Front-Bereichs, in dem der Avatar während des Spiels umherschwirrt.")]
+        public Vector3 wanderCenter = new Vector3(0f, 1.8f, 4.0f);
+        [Tooltip("Halbe Ausdehnung des Front-Bereichs.")]
+        public Vector3 wanderExtents = new Vector3(2.2f, 0.5f, 1.2f);
+        [Tooltip("Mittelpunkt der Schwirr-Zone an der RECHTEN CAVE-Wand; die linke ist " +
+                 "X-gespiegelt. (Seitenwände liegen physisch bei x = ±1,5 m.)")]
+        public Vector3 sideWanderCenter = new Vector3(3.0f, 1.7f, 1.8f);
+        [Tooltip("Halbe Ausdehnung der Seitenwand-Zonen. (0,0,0) = Seitenwände nicht anfliegen.")]
+        public Vector3 sideWanderExtents = new Vector3(0.8f, 0.5f, 1.2f);
         [Tooltip("Min/Max Sekunden, bis der Avatar sich ein neues Flugziel sucht.")]
         public Vector2 wanderIntervalRange = new Vector2(3.5f, 7f);
 
@@ -444,8 +449,7 @@ namespace CaveGame
                     m_BestAtRoundStart = HumanTetrisHighscore.BestScore;
 
                     m_Bubble.Say(PickRandom(startLines), -1f, interrupt: true);
-                    m_Movement.WanderWithin(new Bounds(wanderCenter, wanderExtents * 2f),
-                                            wanderIntervalRange);
+                    m_Movement.WanderWithin(BuildWanderZones(), wanderIntervalRange);
                     break;
 
                 case GameState.GameOver:
@@ -525,6 +529,32 @@ namespace CaveGame
         // ---------------------------------------------------------------------
         // Hilfen
         // ---------------------------------------------------------------------
+
+        /// <summary>
+        /// Baut die Schwirr-Zonen für die Spielrunde: Frontbereich (doppelt gewichtet,
+        /// dort passiert das Spiel) plus je eine Zone an der linken und rechten
+        /// CAVE-Wand. Die Zonen liegen alle vor dem Spieler (z &gt; 0), damit die
+        /// Flugwege zwischen ihnen nicht durch die Spielerposition führen.
+        /// </summary>
+        private Bounds[] BuildWanderZones()
+        {
+            var zones = new List<Bounds>
+            {
+                // Doppelt gelistet = wird doppelt so oft angeflogen.
+                new Bounds(wanderCenter, wanderExtents * 2f),
+                new Bounds(wanderCenter, wanderExtents * 2f)
+            };
+
+            if (sideWanderExtents.sqrMagnitude > 0.0001f)
+            {
+                var right = sideWanderCenter;
+                var left = new Vector3(-sideWanderCenter.x, sideWanderCenter.y, sideWanderCenter.z);
+                zones.Add(new Bounds(right, sideWanderExtents * 2f));
+                zones.Add(new Bounds(left, sideWanderExtents * 2f));
+            }
+
+            return zones.ToArray();
+        }
 
         /// <summary>Erinnert im Menü regelmäßig an den Startknopf, wenn nichts angezeigt wird.</summary>
         private IEnumerator MenuReminderLoop()

@@ -40,7 +40,7 @@ namespace CaveGame
         private Vector3 m_Anchor;
         private Vector3 m_Velocity;
         private bool m_Wander;
-        private Bounds m_WanderBounds;
+        private Bounds[] m_WanderZones;
         private Vector2 m_WanderInterval = new Vector2(3.5f, 7f);
         private float m_NextWanderTime;
         private float m_BobPhase;
@@ -78,10 +78,23 @@ namespace CaveGame
         /// </summary>
         public void WanderWithin(Bounds bounds, Vector2 intervalRange)
         {
-            m_WanderBounds = bounds;
+            WanderWithin(new[] { bounds }, intervalRange);
+        }
+
+        /// <summary>
+        /// Umherschwirren über mehrere Zonen (z. B. Frontbereich + linke/rechte
+        /// CAVE-Wand): Bei jedem Zielwechsel wird zufällig eine Zone und darin ein
+        /// Punkt gewählt. Mehrfach gelistete Zonen werden entsprechend öfter besucht.
+        /// </summary>
+        public void WanderWithin(Bounds[] zones, Vector2 intervalRange)
+        {
+            m_WanderZones = zones;
             m_WanderInterval = intervalRange;
-            m_Wander = true;
-            PickWanderTarget();
+            m_Wander = zones != null && zones.Length > 0;
+            if (m_Wander)
+            {
+                PickWanderTarget();
+            }
         }
 
         // ---------------------------------------------------------------------
@@ -135,10 +148,11 @@ namespace CaveGame
 
         private void PickWanderTarget()
         {
+            var zone = m_WanderZones[Random.Range(0, m_WanderZones.Length)];
             m_Anchor = new Vector3(
-                Random.Range(m_WanderBounds.min.x, m_WanderBounds.max.x),
-                Random.Range(m_WanderBounds.min.y, m_WanderBounds.max.y),
-                Random.Range(m_WanderBounds.min.z, m_WanderBounds.max.z));
+                Random.Range(zone.min.x, zone.max.x),
+                Random.Range(zone.min.y, zone.max.y),
+                Random.Range(zone.min.z, zone.max.z));
             m_NextWanderTime = Time.unscaledTime +
                                Random.Range(m_WanderInterval.x, m_WanderInterval.y);
         }

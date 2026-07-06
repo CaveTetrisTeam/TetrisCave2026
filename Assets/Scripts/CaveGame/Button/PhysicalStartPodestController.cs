@@ -24,17 +24,17 @@ namespace CaveGame
         [Header("Tracking / Auslösung")]
         public bool requireReliableTracking = true;
         [Tooltip("Seitliche Reichweite: so nah (horizontal) muss eine Hand am Knopf sein (Meter).")]
-        public float activationRadius = 0.30f;
+        public float activationRadius = 0.24f;
         [Tooltip("Höhen-Toleranz: so weit ÜBER dem Knopf darf die Hand schweben (Meter).")]
-        public float verticalTolerance = 0.45f;
-        [Tooltip("Haltezeit (Sek.), bis ausgelöst wird.")]
-        public float holdTime = 0.35f;
+        public float verticalTolerance = 0.35f;
+        [Tooltip("Haltezeit (Sek.), bis ausgelöst wird. Lang genug, dass Vorbeiwischen nicht auslöst.")]
+        public float holdTime = 0.5f;
         [Tooltip("Hysterese: Während des Haltens wächst die Erkennungszone um diesen Faktor, " +
                  "damit Tracking-Zittern den Fortschritt nicht abbricht.")]
-        public float holdZoneScale = 1.4f;
+        public float holdZoneScale = 1.25f;
         [Tooltip("Kurze Tracking-Aussetzer bis zu dieser Dauer (Sek.) frieren den Halte-" +
                  "Fortschritt ein, statt ihn zu entleeren.")]
-        public float dropoutGrace = 0.5f;
+        public float dropoutGrace = 0.35f;
         [Tooltip("Sperrzeit (Sek.) nach einer Auslösung.")]
         public float cooldown = 1.0f;
         [Tooltip("Kurze Sperre nach dem Einblenden, damit eine bereits dort liegende Hand nicht sofort startet.")]
@@ -224,7 +224,7 @@ namespace CaveGame
 
             // Leicht unterhalb zulassen (Kalibrier-Ungenauigkeit), nach oben verticalTolerance.
             bool inZone = horizontal <= activationRadius * zoneScale &&
-                          delta.y >= -0.15f &&
+                          delta.y >= -0.10f &&
                           delta.y <= verticalTolerance * zoneScale;
             if (inZone)
             {

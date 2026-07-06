@@ -201,18 +201,21 @@ stabil“, Grün = „startbereit“.
 
 **Auslösung (robust):** Statt eines winzigen, schwer zu treffenden Trigger-Cubes wird **distanzbasiert
 mit kurzem Halten** ausgelöst. Die Erkennungszone ist ein **Zylinder über dem Knopf**: seitlich
-`activationRadius` (Standard 0.30 m), nach oben großzügig `verticalTolerance` (Standard 0.45 m) –
+`activationRadius` (Standard 0.24 m), nach oben `verticalTolerance` (Standard 0.35 m) –
 die Hand schwebt naturgemäß *über* dem Knopf. Geprüft werden **beide** getrackten Hände (unabhängig
 geglättet), nicht mehr nur eine flatternde „aktive“ Handauswahl. Kurz halten (`holdTime`,
-Standard 0.35 s), dann löst der Knopf aus. Der Knopf füllt sich dabei sichtbar von Grün → Druckfarbe
-und **wächst** leicht mit dem Fortschritt.
+Standard 0.5 s – lang genug, dass Vorbeiwischen nicht auslöst), dann löst der Knopf aus. Der Knopf
+füllt sich dabei sichtbar von Grün → Druckfarbe und **wächst** leicht mit dem Fortschritt.
 
 Gegen Tracking-Zittern gibt es zwei Sicherungen:
-- **Hysterese** (`holdZoneScale`, Standard 1.4): Während des Haltens wächst die Zone – kleines
+- **Hysterese** (`holdZoneScale`, Standard 1.25): Während des Haltens wächst die Zone – kleines
   Zittern bricht den Fortschritt nicht ab. Der gehaltene Knopf gewinnt außerdem knappe Duelle
   gegen den Nachbarknopf (Game Over), damit der Fortschritt nicht ständig zurückspringt.
-- **Aussetzer-Gnadenfrist** (`dropoutGrace`, Standard 0.5 s): Verliert die Kinect die Hand kurz,
+- **Aussetzer-Gnadenfrist** (`dropoutGrace`, Standard 0.35 s): Verliert die Kinect die Hand kurz,
   friert der Fortschritt ein, statt sich zu entleeren.
+
+Zu empfindlich (löst versehentlich aus)? → `activationRadius`/`verticalTolerance` verkleinern oder
+`holdTime` erhöhen. Zu schwergängig? → umgekehrt.
 
 **Falls der Knopf weiterhin schwer erreichbar ist** („etwas weiter nach vorne“):
 - `activationRadius` / `verticalTolerance` am `PhysicalStartPodestController` weiter erhöhen.
@@ -297,9 +300,11 @@ Was er tut:
 
 - **Menü (erster Besuch):** erklärt das Spielprinzip Schritt für Schritt per Sprechblasen,
   danach erinnert er regelmäßig an den Podest-Knopf.
-- **Während der Runde:** schwirrt frei in der Umgebung umher (Bereich `wanderCenter`/
-  `wanderExtents` im Inspector) und kommentiert jede Wand: Lob bei Erfolg, Serien-Sprüche
-  ab 3 Wänden in Folge, Trost bei Treffern, Warnung beim letzten Leben.
+- **Während der Runde:** schwirrt frei umher – im Frontbereich (`wanderCenter`/`wanderExtents`,
+  doppelt gewichtet) sowie an der **linken und rechten CAVE-Wand** (`sideWanderCenter`/
+  `sideWanderExtents`; rechte Zone, links gespiegelt; `(0,0,0)` schaltet die Seiten ab) –
+  und kommentiert jede Wand: Lob bei Erfolg, Serien-Sprüche ab 3 Wänden in Folge, Trost
+  bei Treffern, Warnung beim letzten Leben.
 - **Game Over:** kommentiert Punktzahl bzw. neuen Rekord und nennt die Knopf-Belegung.
 
 Technik/Anpassung:
