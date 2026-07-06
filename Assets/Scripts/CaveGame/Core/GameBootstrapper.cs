@@ -3,6 +3,7 @@ using UnityEngine;
 using HTW.CAVE;
 using Whisper;
 using Whisper.Utils;
+using CaveGame.Quiz;
 
 namespace CaveGame
 {
@@ -27,10 +28,9 @@ namespace CaveGame
             EnsureGameAudio();
             EnsureUi();
             EnsureCompanionAvatar();
+            EnsureSpeechToText();
+            EnsureAvatarQuiz();
             RemoveSampleToggleButtons();
-            // Sprachsteuerung vorerst deaktiviert (kein Spielstart per Stimme).
-            // Zum Reaktivieren einfach die beiden folgenden Aufrufe wieder einkommentieren:
-            // EnsureSpeechToText();
             EnsurePhysicalStartPodest();
             // EnsureVoiceControl();
             ApplyReferencePlatformSize();
@@ -204,9 +204,18 @@ namespace CaveGame
 
         private static void EnsureSpeechToText()
         {
-            if (Object.FindObjectOfType<EchoMotionSpeechToText>(true) != null)
+            var existingStt = Object.FindObjectOfType<EchoMotionSpeechToText>(true);
+            if (existingStt != null)
             {
-                return; // bereits vorhanden (z. B. manuell platziert) -> respektieren
+                if (Object.FindObjectOfType<EchoMotionVoiceQuestion>(true) == null)
+                {
+                    var existingQuestion = existingStt.gameObject.AddComponent<EchoMotionVoiceQuestion>();
+                    existingQuestion.speechToText = existingStt;
+                    existingQuestion.microphoneRecord = existingStt.microphoneRecord;
+                    existingQuestion.noSpeechTimeout = 8f;
+                    existingQuestion.maxAttempts = 3;
+                }
+                return; // manuelle Whisper-Konfiguration respektieren
             }
 
             // Ohne vorhandene Modell-Datei NICHT initialisieren – sonst wirft der
@@ -238,6 +247,13 @@ namespace CaveGame
                 stt.microphoneRecord = mic;
                 stt.autoInitWhisper = true;
 
+                var question = go.AddComponent<EchoMotionVoiceQuestion>();
+                question.speechToText = stt;
+                question.microphoneRecord = mic;
+                question.noSpeechTimeout = 8f;
+                question.maxAttempts = 3;
+                question.configureVad = true;
+
                 go.SetActive(true);
             }
             catch (System.Exception e)
@@ -245,6 +261,31 @@ namespace CaveGame
                 Debug.LogWarning("[GameBootstrapper] Sprach-Stack konnte nicht angelegt werden – " +
                                  "Sprachsteuerung inaktiv (Hand/Tastatur bleibt). " + e.Message);
             }
+        }
+
+        private static void EnsureAvatarQuiz()
+        {
+            if (Object.FindObjectOfType<AvatarQuizController>(true) != null) return;
+
+            var voice = Object.FindObjectOfType<EchoMotionVoiceQuestion>(true);
+            if (voice == null)
+            {
+                Debug.LogWarning("[GameBootstrapper] Avatar-Quiz bleibt aus, weil Whisper nicht eingerichtet ist.");
+                return;
+            }
+
+            var go = new GameObject("Avatar Quiz");
+            go.SetActive(false);
+            var ollama = go.AddComponent<OllamaQuizClient>();
+            var quiz = go.AddComponent<AvatarQuizController>();
+            quiz.avatar = Object.FindObjectOfType<AvatarCompanion>(true);
+            quiz.voiceQuestion = voice;
+            quiz.ollama = ollama;
+            quiz.questionDatabase = Resources.Load<QuizQuestionDatabase>("Quiz/QuizQuestions");
+            if (quiz.questionDatabase == null)
+                Debug.LogWarning("[GameBootstrapper] Resources/Quiz/QuizQuestions fehlt; bitte Fragen-Datenbank zuweisen.");
+            quiz.RebuildDeck();
+            go.SetActive(true);
         }
 
         private static void EnsureVoiceControl()

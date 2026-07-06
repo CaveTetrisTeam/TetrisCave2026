@@ -92,5 +92,8 @@ com.unity.textmeshpro
 # Echo-Motion: großes Whisper-Modell nicht versionieren (zu groß für GitHub,
 # pro Rechner lokal herunterladen). Muss nach der *.meta-Negation oben stehen,
 # damit auch die zugehörige .meta ignoriert wird. ggml-tiny.bin bleibt getrackt.
-**/[Aa]ssets/[Ss]treamingAssets/Whisper/ggml-small*.bin
-**/[Aa]ssets/[Ss]treamingAssets/Whisper/ggml-small*.bin.meta
+**/[Aa]ssets/[Ss]treamingAssets/Whisper/ggml-*.bin
+**/[Aa]ssets/[Ss]treamingAssets/Whisper/ggml-*.bin.meta
+
+# Lokales USB-Transferpaket (Installer und Modelle nicht versionieren)
+/CAVE_PC_TRANSFER/

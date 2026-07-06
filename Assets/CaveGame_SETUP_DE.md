@@ -352,6 +352,34 @@ in `Assets/Samples/CAVE/1.1.1/CAVE Tools/Sounds/`.
 
 ---
 
+## 7f. Avatar-Quiz mit Whisper und Ollama
+
+Bei 1000, 2000, 3000 usw. Punkten pausiert das Spiel vollständig. Blocky stellt eine zufällige
+Frage, Whisper erkennt die deutsche Antwort und Ollama bewertet sie. Punkte und Leben werden durch
+das Quiz nie verändert. Jede Frage kommt innerhalb eines Durchlaufs genau einmal vor.
+
+**Einmalige lokale Einrichtung:**
+
+1. Das mehrsprachige Whisper-Modell wie in Abschnitt 7c als
+   `Assets/StreamingAssets/Whisper/ggml-small.bin` ablegen. Modell-Dateien sind absichtlich ignoriert.
+2. [Ollama](https://ollama.com/) installieren und das Standardmodell laden:
+   ```powershell
+   ollama pull gemma3:4b
+   ollama serve
+   ```
+3. Prüfen, dass `http://localhost:11434` erreichbar ist. Modell, URL und 10-Sekunden-Timeout sind
+   am Laufzeitobjekt `Avatar Quiz` (`OllamaQuizClient`) austauschbar.
+4. Die aus `fragen.pdf` übernommene Datenbank muss als
+   `Assets/Resources/Quiz/QuizQuestions.asset` liegen. Über
+   `Assets > Create > Cave Game > Quiz Questions` lässt sie sich im Inspector anlegen und bearbeiten.
+
+Bei fehlendem Modell, nicht laufendem Ollama, Netzwerk-Timeout oder ungültigem JSON wird automatisch
+lokal gegen Musterlösung und Antwortvarianten verglichen. Nach acht Sekunden ohne Sprache startet
+die Aufnahme neu; nach drei erfolglosen Versuchen zeigt Blocky die Lösung und setzt das Spiel fort.
+Game Over und Menüwechsel brechen Aufnahme, Anfrage und Pause unmittelbar ab.
+
+---
+
 ## 8. Spielablauf / Zustände (`GameManager`)
 
 `MainMenu` → (Startknopf oder UI/Tastatur) → `WaitingForPlayerTracking` →

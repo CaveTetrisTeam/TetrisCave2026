@@ -1,0 +1,62 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a1100000000000000000000000000008, type: 3}
+  m_Name: QuizQuestions
+  m_EditorClassIdentifier: 
+  questions:
+  - question: Welche Farbe hat Gras normalerweise?
+    expectedAnswer: Grün
+    acceptedVariants:
+    - grün
+    - die Farbe Grün
+    category: Allgemeinwissen
+  - question: Was ist eins plus eins?
+    expectedAnswer: Zwei
+    acceptedVariants:
+    - '2'
+    - zwei
+    category: Mathematik
+  - question: Wie viele Tage hat eine Woche?
+    expectedAnswer: Sieben
+    acceptedVariants:
+    - '7'
+    - sieben Tage
+    category: Allgemeinwissen
+  - question: Was ist fünf mal zwei?
+    expectedAnswer: Zehn
+    acceptedVariants:
+    - '10'
+    - zehn
+    category: Mathematik
+  - question: Welcher Planet ist der Sonne am nächsten?
+    expectedAnswer: Merkur
+    acceptedVariants:
+    - der Merkur
+    category: Allgemeinwissen
+  - question: Wie nennt man ein Programm, das Internetseiten anzeigt?
+    expectedAnswer: Browser
+    acceptedVariants:
+    - Webbrowser
+    - Internetbrowser
+    category: Informatik
+  - question: Welche Zahl kommt nach neunundneunzig?
+    expectedAnswer: Einhundert
+    acceptedVariants:
+    - '100'
+    - hundert
+    category: Mathematik
+  - question: Was wird nass, während es trocknet?
+    expectedAnswer: Ein Handtuch
+    acceptedVariants:
+    - Handtuch
+    - das Handtuch
+    category: Rätsel

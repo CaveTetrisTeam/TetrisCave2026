@@ -132,6 +132,22 @@ namespace CaveGame
         private int m_BestAtRoundStart;
         private float m_LastPraiseTime = float.NegativeInfinity;
         private int m_LastRandomIndex = -1;
+        private bool m_QuizMode;
+
+        public void ShowMessage(string text, float duration = -1f, bool interrupt = false)
+        {
+            if (m_Bubble != null) m_Bubble.Say(text, duration, interrupt);
+        }
+
+        public void SetQuizMode(bool enabled)
+        {
+            m_QuizMode = enabled;
+            if (enabled)
+            {
+                StopReminder();
+                if (m_Bubble != null) m_Bubble.Clear();
+            }
+        }
 
         // ---------------------------------------------------------------------
         // Aufbau
@@ -479,6 +495,7 @@ namespace CaveGame
 
         private void HandleScoreChanged(int score)
         {
+            if (m_QuizMode) { m_LastScore = score; return; }
             if (GameManager.Instance == null ||
                 GameManager.Instance.CurrentState != GameState.Playing)
             {
@@ -506,6 +523,7 @@ namespace CaveGame
 
         private void HandleLivesChanged(int lives)
         {
+            if (m_QuizMode) { m_LastLives = lives; return; }
             if (GameManager.Instance == null ||
                 GameManager.Instance.CurrentState != GameState.Playing)
             {

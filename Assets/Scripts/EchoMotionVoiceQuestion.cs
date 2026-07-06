@@ -51,6 +51,11 @@ public class EchoMotionVoiceQuestion : MonoBehaviour
     public event Action OnGaveUp;
     public event Action OnListeningStarted;     // e.g. show mic indicator
     public event Action OnListeningStopped;
+    /// <summary>Feuert für jede nicht-leere Transkription, bevor sie bewertet wird.</summary>
+    public event Action<string> OnAnswerTranscribed;
+
+    [Tooltip("Wenn aktiv, übernimmt ein externer Listener von OnAnswerTranscribed die Bewertung.")]
+    public bool useExternalEvaluation;
 
     public bool IsAsking { get; private set; }
 
@@ -214,6 +219,13 @@ public class EchoMotionVoiceQuestion : MonoBehaviour
             return;
         }
 
+        OnAnswerTranscribed?.Invoke(text);
+        if (useExternalEvaluation)
+        {
+            IsAsking = false;
+            return;
+        }
+
         if (Matches(normalized))
         {
             IsAsking = false;
@@ -267,6 +279,14 @@ public class EchoMotionVoiceQuestion : MonoBehaviour
         }
 
         return Regex.Replace(sb.ToString(), "\\s+", " ").Trim();
+    }
+
+    /// <summary>Schließt eine extern bewertete Frage ab, ohne Demo-Events auszulösen.</summary>
+    public void CompleteExternalEvaluation()
+    {
+        IsAsking = false;
+        StopRoutines();
+        if (speechToText != null) speechToText.StopRecording();
     }
 
     private void StopRoutines()
