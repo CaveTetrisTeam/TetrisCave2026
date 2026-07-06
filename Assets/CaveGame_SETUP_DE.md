@@ -339,6 +339,11 @@ Felder automatisch aus `Resources`:
   (ehemals „Game Over #2 (Super Mario)…“ aus dem Sounds-Ordner; per `git mv` samt .meta
   verschoben, Referenzen bleiben gültig)
 
+**Lautstärke:** Der Fehler-Sound wird beim Laden um `errorSoundBoost` (Standard 2.5×, am
+`WallSpawner`) direkt in den Audiodaten verstärkt, weil die Hintergrundmusik den Original-Clip
+übertönt – AudioSources können nicht zuverlässig über 100 % verstärken. Immer noch zu leise/laut?
+→ `errorSoundBoost` anpassen (1 = Original).
+
 **Sound tauschen:** einfach die MP3 in `Resources/Sfx/` durch eine gleichnamige Datei ersetzen –
 oder am `WallSpawner` (`errorSound`) manuell einen anderen Clip zuweisen. Abgespielt wird über
 die AudioSource des GameManagers (`PlayOneShot`), damit der Ton beim Despawnen der Wand nicht
