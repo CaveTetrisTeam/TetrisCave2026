@@ -200,7 +200,7 @@ namespace CaveGame
         /// auf das kleine Modell und Deutsch. Das GameObject wird inaktiv erzeugt, damit
         /// Modellpfad/Sprache gesetzt werden, BEVOR der WhisperManager im Awake lädt.
         /// </summary>
-        private const string VoiceModelRelativePath = "Whisper/ggml-small.bin";
+        private const string VoiceModelRelativePath = "Whisper/ggml-medium.bin";
 
         private static void EnsureSpeechToText()
         {
@@ -225,7 +225,7 @@ namespace CaveGame
             if (!File.Exists(modelFullPath))
             {
                 Debug.LogWarning("[GameBootstrapper] Sprachmodell nicht gefunden: " + modelFullPath +
-                                 "\nSprachsteuerung ist deaktiviert. Lege 'ggml-small.bin' in " +
+                                 "\nSprachsteuerung ist deaktiviert. Lege 'ggml-medium.bin' in " +
                                  "Assets/StreamingAssets/Whisper/ ab (siehe CaveGame_SETUP_DE.md, Abschnitt 7c).");
                 return;
             }

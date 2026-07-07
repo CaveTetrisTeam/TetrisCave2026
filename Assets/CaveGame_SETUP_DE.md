@@ -264,34 +264,35 @@ Stellschrauben am `PodestVoiceControl`: die Keyword-Listen `startKeywords` / `re
 
 ---
 
-## 7c. Whisper-Modell auf „small" umstellen & herunterladen
+## 7c. Whisper-Modell auf „medium" umstellen & herunterladen
 
-Das Projekt nutzt jetzt überall das **small**-Modell (statt tiny): besser bei deutscher Erkennung,
-dafür größer (~488 MB) und etwas langsamer. Die Konfiguration zeigt bereits auf
-`Whisper/ggml-small.bin` (auto-erzeugter Stack **und** `test2.unity`). Die Modell-Datei selbst ist
-**nicht** im Git (zu groß) und muss **pro Rechner einmal** heruntergeladen werden.
+Das Projekt nutzt jetzt überall das **medium**-Modell (statt small): nochmal deutlich besser bei
+deutscher Erkennung (wichtig für die Quiz-Antworten), dafür größer (~1,5 GB) und langsamer bei
+der Transkription. Die Konfiguration zeigt bereits auf `Whisper/ggml-medium.bin` (auto-erzeugter
+Stack **und** `test2.unity`). Die Modell-Datei selbst ist **nicht** im Git (zu groß) und muss
+**pro Rechner einmal** heruntergeladen werden.
 
 **Modell herunterladen (auf dem CAVE-/Main-Rechner):**
 
-1. Datei `ggml-small.bin` (multilingual!) besorgen – z. B. per Terminal:
-   ```bash
-   curl -L -o "Assets/StreamingAssets/Whisper/ggml-small.bin" \
-     https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin
-   ```
-   (oder im Browser von <https://huggingface.co/ggerganov/whisper.cpp/tree/main> laden und nach
-   `Assets/StreamingAssets/Whisper/` legen). **Nicht** `ggml-small.en.bin` nehmen – das ist nur Englisch.
+1. Datei `ggml-medium.bin` (multilingual!) im Browser herunterladen:
+   <https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-medium.bin>
+   und nach `Assets/StreamingAssets/Whisper/` legen.
+   (Übersicht aller Modelle: <https://huggingface.co/ggerganov/whisper.cpp/tree/main>.)
+   **Nicht** `ggml-medium.en.bin` nehmen – das ist nur Englisch.
 2. In Unity kurz warten, bis der Import durch ist. Fertig – beim Start lädt der `WhisperManager`
-   automatisch `ggml-small.bin`.
+   automatisch `ggml-medium.bin`.
 
 **Wo das Modell konfiguriert ist (falls du es manuell ändern willst):**
-- `WhisperManager`-Komponente → Feld **Model Path** = `Whisper/ggml-small.bin`,
+- `WhisperManager`-Komponente → Feld **Model Path** = `Whisper/ggml-medium.bin`,
   **Is Model Path In Streaming Assets** = an, **Language** = `de`.
+- Auto-Stack: `GameBootstrapper.cs` → Konstante `VoiceModelRelativePath`.
 
 **Hinweise:**
-- `.gitignore` ignoriert `ggml-small*.bin` bereits → wird nicht eingecheckt, jeder Rechner lädt es lokal.
+- `.gitignore` ignoriert `ggml-*.bin` bereits → wird nicht eingecheckt, jeder Rechner lädt es lokal.
 - Das alte `ggml-tiny.bin` (im Git, ~77 MB) wird nicht mehr verwendet. Optional entfernen:
   `git rm Assets/StreamingAssets/Whisper/ggml-tiny.bin` (dann committen).
-- Anderes Modell gewünscht (z. B. `medium`)? Datei ablegen und denselben `ModelPath` anpassen.
+- Ein evtl. noch vorhandenes `ggml-small.bin` kann lokal gelöscht werden.
+- Anderes Modell gewünscht (z. B. zurück zu `small`)? Datei ablegen und denselben `ModelPath` anpassen.
 
 ---
 
@@ -361,7 +362,7 @@ das Quiz nie verändert. Jede Frage kommt innerhalb eines Durchlaufs genau einma
 **Einmalige lokale Einrichtung:**
 
 1. Das mehrsprachige Whisper-Modell wie in Abschnitt 7c als
-   `Assets/StreamingAssets/Whisper/ggml-small.bin` ablegen. Modell-Dateien sind absichtlich ignoriert.
+   `Assets/StreamingAssets/Whisper/ggml-medium.bin` ablegen. Modell-Dateien sind absichtlich ignoriert.
 2. [Ollama](https://ollama.com/) installieren und das Standardmodell laden:
    ```powershell
    ollama pull gemma3:4b
