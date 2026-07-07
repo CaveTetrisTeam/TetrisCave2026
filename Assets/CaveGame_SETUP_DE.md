@@ -52,7 +52,7 @@ Alles ist idempotent und greift nur, wenn nötig. Manuell erneut auslösbar übe
 Assets/Scripts/CaveGame/
   Core/    GameState.cs, GameManager.cs, GameBootstrapper.cs
   Kinect/  KinectPlayerPresence.cs, KinectHandInteractor.cs
-  Button/  PhysicalStartPodestController.cs, PodestVoiceControl.cs
+  Button/  PhysicalStartPodestController.cs
   Gameplay/WallColliderBuilder.cs, Wall.cs, WallMover.cs, WallHitZone.cs,
            WallSpawner.cs, PlayerBodyPart.cs
   UI/      CaveUiFactory.cs, IngameHud.cs, SkeletonPreviewGraphic.cs, GameOverController.cs
@@ -239,40 +239,28 @@ Das eigene 2 × 2-Meter-Rohmodell verwendet dafür X/Z-Scale **1.5** statt bishe
 
 ---
 
-## 7b. Sprachsteuerung des Podests
+## 7b. Sprach-Stack (Whisper)
 
-Zusätzlich zur Hand lassen sich die Podest-Knöpfe per **Sprache** auslösen
-(`PodestVoiceControl`). Das Mikrofon hört **automatisch** zu, solange das Podest sichtbar ist
-(MainMenu / Game Over), und ist sonst aus (keine Fehlauslösung). Die Befehle werden auf
-**ENGLISCH** gesprochen (englisches Whisper-Modell, siehe 7c):
-
-- **Startbildschirm:** „start", „go", „play", „begin" … → Spiel starten
-- **Game Over:** „restart", „again", „retry" … → Neustart ·
-  „menu", „back", „exit" … → Hauptmenü
-
-Auslösung folgt denselben Regeln wie der Hand-Knopf (nur im passenden Zustand, Cooldown,
-zuverlässiges Tracking). Es wird VAD-fenstergesteuert transkribiert (nur wenn jemand spricht).
-
-**Voraussetzungen:** ein Mikrofon am Rechner **und** das heruntergeladene Whisper-Modell (Abschnitt 7c).
-Fehlt der Sprach-Stack/das Modell, bleibt einfach Hand + Tastatur aktiv.
+Die Podest-Knöpfe werden per **Hand/Tastatur** bedient (die frühere Podest-Sprachsteuerung
+`PodestVoiceControl` wurde entfernt). Sprache wird nur noch für das **Avatar-Quiz** genutzt
+(Abschnitt zum Quiz weiter unten).
 
 Der Bootstrapper legt den Sprach-Stack (WhisperManager + MicrophoneRecord + EchoMotionSpeechToText)
 automatisch an (Modell **small.en**, Sprache **en**), falls in der Szene keiner vorhanden ist. Ein
 selbst platzierter Stack hat Vorrang.
 
-Stellschrauben am `PodestVoiceControl`: die Keyword-Listen `startKeywords` / `restartKeywords` /
-`menuKeywords` und `vadStopTime` (Stille bis zur Auswertung).
+**Voraussetzungen:** ein Mikrofon am Rechner **und** das heruntergeladene Whisper-Modell (Abschnitt 7c).
+Fehlt der Sprach-Stack/das Modell, läuft das Spiel normal weiter – nur das Quiz bleibt aus.
 
 ---
 
 ## 7c. Whisper-Modell: Englisch („small.en") & herunterladen
 
 Das Projekt nutzt jetzt überall das **englische small-Modell** (`ggml-small.en.bin`): Die
-englische Erkennung ist deutlich zuverlässiger als die deutsche – **alle Sprachbefehle und
-Quiz-Antworten werden daher auf ENGLISCH gesprochen**. Die Whisper-Sprache steht auf `en`,
-die Quizfragen (`Resources/Quiz/QuizQuestions.asset`) und Podest-Befehle sind auf Englisch
-umgestellt. Die Modell-Datei selbst ist **nicht** im Git (zu groß) und muss **pro Rechner
-einmal** heruntergeladen werden.
+englische Erkennung ist deutlich zuverlässiger als die deutsche – **die Quiz-Antworten werden
+daher auf ENGLISCH gesprochen**. Die Whisper-Sprache steht auf `en`, die Quizfragen
+(`Resources/Quiz/QuizQuestions.asset`) sind auf Englisch umgestellt. Die Modell-Datei selbst
+ist **nicht** im Git (zu groß) und muss **pro Rechner einmal** heruntergeladen werden.
 
 **Modell herunterladen (auf dem CAVE-/Main-Rechner):**
 

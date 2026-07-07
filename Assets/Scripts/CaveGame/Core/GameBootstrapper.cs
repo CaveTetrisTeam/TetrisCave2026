@@ -32,7 +32,6 @@ namespace CaveGame
             EnsureAvatarQuiz();
             RemoveSampleToggleButtons();
             EnsurePhysicalStartPodest();
-            // EnsureVoiceControl();
             ApplyReferencePlatformSize();
         }
 
@@ -291,17 +290,6 @@ namespace CaveGame
                 Debug.LogWarning("[GameBootstrapper] Resources/Quiz/QuizQuestions fehlt; bitte Fragen-Datenbank zuweisen.");
             quiz.RebuildDeck();
             go.SetActive(true);
-        }
-
-        private static void EnsureVoiceControl()
-        {
-            if (Object.FindObjectOfType<PodestVoiceControl>(true) != null)
-            {
-                return;
-            }
-
-            var go = new GameObject("Podest Voice Control");
-            go.AddComponent<PodestVoiceControl>();
         }
 
         /// <summary>
