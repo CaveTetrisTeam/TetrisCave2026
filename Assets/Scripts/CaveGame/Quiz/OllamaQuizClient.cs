@@ -20,6 +20,39 @@ namespace CaveGame.Quiz
         [Serializable] private sealed class Request { public string model; public bool stream; public string format; public Message[] messages; public Options options; }
         [Serializable] private sealed class Response { public Message message; }
 
+        /// <summary>
+        /// Prüft beim Start, ob Ollama überhaupt läuft, und schreibt ein eindeutiges
+        /// Ergebnis ins Log – so sieht man das Problem sofort und nicht erst bei der
+        /// ersten Quizfrage ("Curl error 7: Failed to connect to localhost:11434").
+        /// </summary>
+        private async void Start()
+        {
+            try
+            {
+                var baseUri = new Uri(new Uri(endpoint), "/");
+                using (var request = UnityWebRequest.Get(baseUri))
+                {
+                    request.timeout = 5;
+                    UnityWebRequestAsyncOperation operation = request.SendWebRequest();
+                    while (!operation.isDone)
+                        await Task.Yield();
+
+                    if (request.result == UnityWebRequest.Result.Success)
+                        Debug.Log("[AvatarQuiz] Ollama erreichbar unter " + baseUri +
+                                  " (Modell: " + model + ").");
+                    else
+                        Debug.LogWarning("[AvatarQuiz] Ollama NICHT erreichbar (" + baseUri + "): " +
+                                         request.error + "\nQuiz-Antworten werden nur lokal verglichen. " +
+                                         "Auf diesem Rechner Ollama starten ('ollama serve' bzw. Ollama-App) " +
+                                         "und das Modell laden: 'ollama pull " + model + "'.");
+                }
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning("[AvatarQuiz] Ollama-Erreichbarkeits-Check fehlgeschlagen: " + exception.Message);
+            }
+        }
+
         public async Task<OllamaQuizResult> EvaluateAsync(QuizQuestion question, string transcript, CancellationToken token)
         {
             string prompt = "Bewerte die Antwort auf eine Quizfrage. Frage und Musterlösung sind auf " +

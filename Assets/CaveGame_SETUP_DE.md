@@ -360,8 +360,14 @@ das Quiz nie verändert. Jede Frage kommt innerhalb eines Durchlaufs genau einma
    ollama pull gemma3:4b
    ollama serve
    ```
-3. Prüfen, dass `http://localhost:11434` erreichbar ist. Modell, URL und 10-Sekunden-Timeout sind
-   am Laufzeitobjekt `Avatar Quiz` (`OllamaQuizClient`) austauschbar.
+3. Prüfen, dass `http://localhost:11434` erreichbar ist (Browser: „Ollama is running").
+   Modell, URL und 10-Sekunden-Timeout sind am Laufzeitobjekt `Avatar Quiz`
+   (`OllamaQuizClient`) austauschbar.
+   **Troubleshooting:** Steht in der `Player.log` beim Start `[AvatarQuiz] Ollama NICHT
+   erreichbar` bzw. bei einer Frage `Curl error 7 … localhost port 11434`, läuft Ollama
+   nicht → Ollama-App starten (Autostart in den Ollama-Einstellungen aktivieren!) oder in
+   der PowerShell `ollama serve`. Das Quiz funktioniert dann zwar über den lokalen
+   Wortvergleich weiter, aber ohne KI-Bewertung sinngleicher Antworten.
 4. Die aus `fragen.pdf` übernommene Datenbank muss als
    `Assets/Resources/Quiz/QuizQuestions.asset` liegen. Über
    `Assets > Create > Cave Game > Quiz Questions` lässt sie sich im Inspector anlegen und bearbeiten.

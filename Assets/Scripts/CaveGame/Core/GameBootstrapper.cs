@@ -240,11 +240,19 @@ namespace CaveGame
                 // ggml-*.en.bin ist ein reines Englisch-Modell -> Antworten/Befehle
                 // werden auf ENGLISCH gesprochen (bessere Erkennung in der CAVE).
                 whisper.language = "en";
+                // Kleineres Audio-Kontextfenster: beschleunigt die CPU-Inferenz kurzer
+                // Antworten massiv (Player.log: ~6,4 s pro Antwort). 768 von 1500
+                // entspricht ~15 s Audio – mehr nehmen wir ohnehin nicht mehr auf.
+                whisper.audioCtx = 768;
 
                 var mic = go.AddComponent<MicrophoneRecord>();
                 // Standardmäßig spielt MicrophoneRecord jede Aufnahme als "Echo" über
                 // die Lautsprecher zurück – in der CAVE unerwünscht (Störschall).
                 mic.echo = false;
+                // Harte Obergrenze pro Aufnahme: Bei Dauerlärm stoppte die VAD nie,
+                // die Aufnahme lief bis 60 s und die anschließende Whisper-Inferenz
+                // fror das Spiel gefühlt minutenlang ein ("hängt sich auf").
+                mic.maxLengthSec = 12;
 
                 var stt = go.AddComponent<EchoMotionSpeechToText>();
                 stt.whisper = whisper;

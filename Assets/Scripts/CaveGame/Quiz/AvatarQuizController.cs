@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using UnityEngine;
+using Whisper.Utils;
 
 namespace CaveGame.Quiz
 {
@@ -20,6 +21,9 @@ namespace CaveGame.Quiz
         [Min(0f)] public float feedbackDuration = 4f;
         [Tooltip("Antwortversuche (falsch oder nur Geräusche), bevor die Lösung verraten wird.")]
         [Min(1)] public int answerAttempts = 3;
+        [Tooltip("Sicherheitsnetz: Kommt so lange (Realzeit) kein Ergebnis für einen Versuch, " +
+                 "wird das Quiz aufgelöst und das Spiel läuft weiter – nie mehr Dauer-Hänger.")]
+        [Min(10f)] public float attemptWatchdogSeconds = 45f;
 
         [Header("Referenzen")]
         public AvatarCompanion avatar;
@@ -33,6 +37,7 @@ namespace CaveGame.Quiz
         private QuizQuestion currentQuestion;
         private CancellationTokenSource cancellation;
         private Coroutine finishRoutine;
+        private Coroutine watchdogRoutine;
         private int remainingAttempts;
 
         private void Awake()
@@ -75,6 +80,8 @@ namespace CaveGame.Quiz
             voiceQuestion.OnAnswerTranscribed += HandleAnswerTranscribed;
             voiceQuestion.OnNotUnderstood += HandleNotUnderstood;
             voiceQuestion.OnGaveUp += HandleGaveUp;
+            if (voiceQuestion.microphoneRecord != null)
+                voiceQuestion.microphoneRecord.OnRecordStop += HandleRecordStopped;
         }
 
         private void UnsubscribeVoice()
@@ -83,6 +90,18 @@ namespace CaveGame.Quiz
             voiceQuestion.OnAnswerTranscribed -= HandleAnswerTranscribed;
             voiceQuestion.OnNotUnderstood -= HandleNotUnderstood;
             voiceQuestion.OnGaveUp -= HandleGaveUp;
+            if (voiceQuestion.microphoneRecord != null)
+                voiceQuestion.microphoneRecord.OnRecordStop -= HandleRecordStopped;
+        }
+
+        /// <summary>
+        /// Mikro ist aus, Whisper transkribiert (dauert mehrere Sekunden): sofort
+        /// Rückmeldung zeigen, damit die Wartezeit nicht wie ein Absturz wirkt.
+        /// </summary>
+        private void HandleRecordStopped(AudioChunk _)
+        {
+            if (IsQuizActive && finishRoutine == null)
+                avatar.ShowMessage("Einen Moment – ich höre mir deine Antwort an …", QuestionHoldSeconds, true);
         }
 
         private void HandleStateChanged(GameState state)
@@ -155,6 +174,34 @@ namespace CaveGame.Quiz
         {
             voiceQuestion.AskQuestion(currentQuestion.AllAcceptedAnswers()
                 .Where(x => !string.IsNullOrWhiteSpace(x)).ToArray());
+            RestartWatchdog();
+        }
+
+        // ---------------------------------------------------------------------
+        // Watchdog: Egal was bei Aufnahme/Whisper/Ollama schiefgeht – nach
+        // spätestens attemptWatchdogSeconds wird aufgelöst und weitergespielt.
+        // (Das Spiel steht währenddessen auf Time.timeScale = 0.)
+        // ---------------------------------------------------------------------
+
+        private void RestartWatchdog()
+        {
+            if (watchdogRoutine != null) StopCoroutine(watchdogRoutine);
+            watchdogRoutine = StartCoroutine(AttemptWatchdog());
+        }
+
+        private void StopWatchdog()
+        {
+            if (watchdogRoutine != null) { StopCoroutine(watchdogRoutine); watchdogRoutine = null; }
+        }
+
+        private IEnumerator AttemptWatchdog()
+        {
+            yield return new WaitForSecondsRealtime(attemptWatchdogSeconds);
+            watchdogRoutine = null;
+            if (!IsQuizActive) yield break;
+            Debug.LogWarning("[AvatarQuiz] Watchdog: kein Auswertungs-Ergebnis nach " +
+                             attemptWatchdogSeconds + " s – Quiz wird aufgelöst, Spiel läuft weiter.");
+            FinishWithFeedback(false, null);
         }
 
         private async void HandleAnswerTranscribed(string transcript)
@@ -202,7 +249,9 @@ namespace CaveGame.Quiz
         {
             // voiceQuestion hört in diesem Fall selbst erneut zu – nur den Text auffrischen,
             // damit die Frage lesbar stehen bleibt.
-            if (IsQuizActive) ShowQuestion("Ich habe dich nicht gehört – sprich bitte laut und deutlich!");
+            if (!IsQuizActive) return;
+            ShowQuestion("Ich habe dich nicht gehört – sprich bitte laut und deutlich!");
+            RestartWatchdog();
         }
 
         private void HandleGaveUp()
@@ -227,6 +276,7 @@ namespace CaveGame.Quiz
 
         private void FinishWithFeedback(bool correct, string feedback, string understood = null)
         {
+            StopWatchdog();
             voiceQuestion.CompleteExternalEvaluation();
             string message;
             if (correct)
@@ -267,6 +317,7 @@ namespace CaveGame.Quiz
         {
             if (!IsQuizActive) return;
             IsQuizActive = false;
+            StopWatchdog();
             cancellation?.Dispose();
             cancellation = null;
             currentQuestion = null;
