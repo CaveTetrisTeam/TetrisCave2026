@@ -44,6 +44,8 @@ namespace CaveGame
         public Vector3 menuAnchor = new Vector3(1.0f, 0.9f, 2.6f);
         [Tooltip("Schwebeposition beim Game-Over-Kommentar.")]
         public Vector3 gameOverAnchor = new Vector3(-1.0f, 0.9f, 2.6f);
+        [Tooltip("Schwebeposition während einer Quizfrage – ruhig mittig vor dem Spieler.")]
+        public Vector3 quizAnchor = new Vector3(0f, 1.3f, 2.6f);
         [Tooltip("Mittelpunkt des Front-Bereichs, in dem der Avatar während des Spiels umherschwirrt.")]
         public Vector3 wanderCenter = new Vector3(0f, 1.8f, 4.0f);
         [Tooltip("Halbe Ausdehnung des Front-Bereichs.")]
@@ -146,6 +148,15 @@ namespace CaveGame
             {
                 StopReminder();
                 if (m_Bubble != null) m_Bubble.Clear();
+                // Nicht weiter umherschwirren: mittig vor dem Spieler schweben,
+                // damit die Frage in der Sprechblase ruhig lesbar ist.
+                if (m_Movement != null) m_Movement.MoveTo(quizAnchor);
+            }
+            else if (m_Movement != null && GameManager.Instance != null &&
+                     GameManager.Instance.CurrentState == GameState.Playing)
+            {
+                // Quiz vorbei, Runde läuft weiter -> zurück in den Schwirr-Modus.
+                m_Movement.WanderWithin(BuildWanderZones(), wanderIntervalRange);
             }
         }
 

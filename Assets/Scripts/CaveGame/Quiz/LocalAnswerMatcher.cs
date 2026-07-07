@@ -7,6 +7,19 @@ namespace CaveGame.Quiz
 {
     public static class LocalAnswerMatcher
     {
+        // Whisper annotiert Nicht-Sprache als "(Geräusch)", "[Musik]", "*hustet*", ♪ ...
+        private static readonly Regex NoiseAnnotations =
+            new Regex(@"\[[^\]]*\]|\([^)]*\)|\*[^*]*\*|[♪♫]+", RegexOptions.Compiled);
+
+        /// <summary>
+        /// Entfernt Whisper-Annotationen für Nicht-Sprache aus dem Transkript.
+        /// Bleibt danach nichts übrig, wurde keine echte Antwort gesprochen.
+        /// </summary>
+        public static string StripNoiseAnnotations(string value)
+        {
+            return string.IsNullOrEmpty(value) ? string.Empty : NoiseAnnotations.Replace(value, " ");
+        }
+
         public static bool IsMatch(string transcript, QuizQuestion question)
         {
             string value = Normalize(transcript);

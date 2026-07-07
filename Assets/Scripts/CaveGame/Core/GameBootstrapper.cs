@@ -241,6 +241,9 @@ namespace CaveGame
                 whisper.language = "de";
 
                 var mic = go.AddComponent<MicrophoneRecord>();
+                // Standardmäßig spielt MicrophoneRecord jede Aufnahme als "Echo" über
+                // die Lautsprecher zurück – in der CAVE unerwünscht (Störschall).
+                mic.echo = false;
 
                 var stt = go.AddComponent<EchoMotionSpeechToText>();
                 stt.whisper = whisper;

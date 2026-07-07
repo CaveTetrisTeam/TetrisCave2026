@@ -9,10 +9,17 @@ namespace CaveGame.Quiz
 {
     public sealed class AvatarQuizController : MonoBehaviour
     {
+        // Anzeigedauer "bis auf Weiteres": Die Frage bleibt in der Sprechblase stehen,
+        // bis sie per interrupt durch einen Hinweis oder das Ergebnis ersetzt wird.
+        // (Say mit Dauer <= 0 wäre "automatisch" und damit auf maxHoldSeconds gedeckelt.)
+        private const float QuestionHoldSeconds = 99999f;
+
         [Header("Quiz")]
         public QuizQuestionDatabase questionDatabase;
         [Min(1)] public int scoreInterval = 1000;
         [Min(0f)] public float feedbackDuration = 4f;
+        [Tooltip("Antwortversuche (falsch oder nur Geräusche), bevor die Lösung verraten wird.")]
+        [Min(1)] public int answerAttempts = 3;
 
         [Header("Referenzen")]
         public AvatarCompanion avatar;
@@ -26,6 +33,7 @@ namespace CaveGame.Quiz
         private QuizQuestion currentQuestion;
         private CancellationTokenSource cancellation;
         private Coroutine finishRoutine;
+        private int remainingAttempts;
 
         private void Awake()
         {
@@ -119,26 +127,60 @@ namespace CaveGame.Quiz
 
             currentQuestion = deck.Next();
             IsQuizActive = true;
+            remainingAttempts = Mathf.Max(1, answerAttempts);
             cancellation = new CancellationTokenSource();
             Time.timeScale = 0f;
+            // Time.timeScale pausiert KEINE AudioSources: Die Musik liefe weiter, würde
+            // vom Mikrofon mit aufgenommen und von Whisper als "(Geräusch)" transkribiert.
+            AudioListener.pause = true;
             avatar.SetQuizMode(true);
-            avatar.ShowMessage(currentQuestion.question, -1f, true);
             voiceQuestion.useExternalEvaluation = true;
             voiceQuestion.maxAttempts = 3;
             voiceQuestion.noSpeechTimeout = 8f;
             voiceQuestion.configureVad = true;
-            voiceQuestion.AskQuestion(currentQuestion.AllAcceptedAnswers().Where(x => !string.IsNullOrWhiteSpace(x)).ToArray());
+            ShowQuestion(null);
+            StartListening();
+        }
+
+        /// <summary>Zeigt die Frage dauerhaft an, optional mit Hinweiszeile darüber.</summary>
+        private void ShowQuestion(string hint)
+        {
+            string text = string.IsNullOrEmpty(hint)
+                ? currentQuestion.question
+                : hint + "\n" + currentQuestion.question;
+            avatar.ShowMessage(text, QuestionHoldSeconds, true);
+        }
+
+        private void StartListening()
+        {
+            voiceQuestion.AskQuestion(currentQuestion.AllAcceptedAnswers()
+                .Where(x => !string.IsNullOrWhiteSpace(x)).ToArray());
         }
 
         private async void HandleAnswerTranscribed(string transcript)
         {
             if (!IsQuizActive || currentQuestion == null) return;
+
+            // Whisper markiert Nicht-Sprache als "(Geräusch)", "[Musik]" o. Ä. – solche
+            // Anteile zählen nicht als Antwort, sondern kosten nur einen Versuch.
+            string spoken = LocalAnswerMatcher.StripNoiseAnnotations(transcript);
+            if (LocalAnswerMatcher.Normalize(spoken).Length == 0)
+            {
+                Retry("Ich habe nur Geräusche gehört – sag deine Antwort laut und deutlich!");
+                return;
+            }
+
+            string understood = spoken.Trim();
+            // Sofort zeigen, was verstanden wurde – so sieht der Spieler schon während
+            // der Bewertung, ob er ggf. deutlicher sprechen muss.
+            ShowQuestion("Ich habe „" + understood + "“ verstanden – einen Moment …");
+
             bool correct;
             string feedback;
             try
             {
                 if (ollama == null) throw new InvalidOperationException("Ollama-Client fehlt.");
-                OllamaQuizResult result = await ollama.EvaluateAsync(currentQuestion, transcript, cancellation.Token);
+                OllamaQuizResult result = await ollama.EvaluateAsync(currentQuestion, spoken, cancellation.Token);
                 correct = result.correct;
                 feedback = result.feedback;
             }
@@ -146,27 +188,60 @@ namespace CaveGame.Quiz
             catch (Exception exception)
             {
                 Debug.LogWarning("[AvatarQuiz] Ollama nicht verfügbar, lokaler Vergleich wird verwendet: " + exception.Message);
-                correct = LocalAnswerMatcher.IsMatch(transcript, currentQuestion);
-                feedback = correct ? "Richtig!" : "Leider falsch – richtig wäre: " + currentQuestion.expectedAnswer;
+                correct = LocalAnswerMatcher.IsMatch(spoken, currentQuestion);
+                feedback = null;
             }
-            if (IsQuizActive) FinishWithFeedback(correct, feedback);
+            if (!IsQuizActive) return;
+
+            if (correct) FinishWithFeedback(true, feedback);
+            else Retry("Ich habe „" + understood + "“ verstanden – das ist leider falsch. Versuch es noch einmal!",
+                       understood);
         }
 
         private void HandleNotUnderstood(int attempt)
         {
-            if (IsQuizActive) avatar.ShowMessage("Ich habe dich nicht verstanden. Bitte versuche es noch einmal.", 2.5f, true);
+            // voiceQuestion hört in diesem Fall selbst erneut zu – nur den Text auffrischen,
+            // damit die Frage lesbar stehen bleibt.
+            if (IsQuizActive) ShowQuestion("Ich habe dich nicht gehört – sprich bitte laut und deutlich!");
         }
 
         private void HandleGaveUp()
         {
-            if (IsQuizActive)
-                FinishWithFeedback(false, "Leider nicht verstanden – richtig wäre: " + currentQuestion.expectedAnswer);
+            if (IsQuizActive) FinishWithFeedback(false, null);
         }
 
-        private void FinishWithFeedback(bool correct, string feedback)
+        /// <summary>Falsche/unverständliche Antwort: neuer Versuch oder Auflösung.</summary>
+        private void Retry(string hint, string understood = null)
+        {
+            remainingAttempts--;
+            if (remainingAttempts > 0)
+            {
+                ShowQuestion(hint);
+                StartListening();
+            }
+            else
+            {
+                FinishWithFeedback(false, null, understood);
+            }
+        }
+
+        private void FinishWithFeedback(bool correct, string feedback, string understood = null)
         {
             voiceQuestion.CompleteExternalEvaluation();
-            string message = correct ? "Richtig! " + feedback : "Leider falsch – richtig wäre: " + currentQuestion.expectedAnswer;
+            string message;
+            if (correct)
+            {
+                message = string.IsNullOrWhiteSpace(feedback) ? "Richtig!" : "Richtig! " + feedback;
+            }
+            else
+            {
+                // Das Verstandene mit anzeigen, damit der Spieler nachvollziehen kann,
+                // was beim Mikrofon/Whisper angekommen ist.
+                message = string.IsNullOrEmpty(understood)
+                    ? "Leider falsch – die richtige Antwort wäre: " + currentQuestion.expectedAnswer
+                    : "Ich habe „" + understood + "“ verstanden.\nLeider falsch – die richtige Antwort wäre: " +
+                      currentQuestion.expectedAnswer;
+            }
             avatar.ShowMessage(message, feedbackDuration, true);
             if (finishRoutine != null) StopCoroutine(finishRoutine);
             finishRoutine = StartCoroutine(ResumeAfterFeedback());
@@ -184,8 +259,6 @@ namespace CaveGame.Quiz
             if (!IsQuizActive) return;
             if (finishRoutine != null) { StopCoroutine(finishRoutine); finishRoutine = null; }
             cancellation?.Cancel();
-            cancellation?.Dispose();
-            cancellation = null;
             if (voiceQuestion != null) voiceQuestion.CancelQuestion();
             EndQuiz();
         }
@@ -199,6 +272,7 @@ namespace CaveGame.Quiz
             currentQuestion = null;
             if (voiceQuestion != null) voiceQuestion.useExternalEvaluation = false;
             if (avatar != null) avatar.SetQuizMode(false);
+            AudioListener.pause = false;
             Time.timeScale = 1f;
         }
     }
