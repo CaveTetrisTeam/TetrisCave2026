@@ -13,50 +13,51 @@ MonoBehaviour:
   m_Name: QuizQuestions
   m_EditorClassIdentifier: 
   questions:
-  - question: Welche Farbe hat Gras normalerweise?
-    expectedAnswer: Grün
+  - question: What color is grass usually?
+    expectedAnswer: Green
     acceptedVariants:
-    - grün
-    - die Farbe Grün
+    - green
+    - the color green
     category: Allgemeinwissen
-  - question: Was ist eins plus eins?
-    expectedAnswer: Zwei
+  - question: What is one plus one?
+    expectedAnswer: Two
     acceptedVariants:
     - '2'
-    - zwei
+    - two
     category: Mathematik
-  - question: Wie viele Tage hat eine Woche?
-    expectedAnswer: Sieben
+  - question: How many days are in a week?
+    expectedAnswer: Seven
     acceptedVariants:
     - '7'
-    - sieben Tage
+    - seven days
     category: Allgemeinwissen
-  - question: Was ist fünf mal zwei?
-    expectedAnswer: Zehn
+  - question: What is five times two?
+    expectedAnswer: Ten
     acceptedVariants:
     - '10'
-    - zehn
+    - ten
     category: Mathematik
-  - question: Welcher Planet ist der Sonne am nächsten?
-    expectedAnswer: Merkur
+  - question: Which planet is closest to the sun?
+    expectedAnswer: Mercury
     acceptedVariants:
-    - der Merkur
+    - the planet Mercury
     category: Allgemeinwissen
-  - question: Wie nennt man ein Programm, das Internetseiten anzeigt?
+  - question: What do you call a program that displays websites?
     expectedAnswer: Browser
     acceptedVariants:
-    - Webbrowser
-    - Internetbrowser
+    - web browser
+    - internet browser
     category: Informatik
-  - question: Welche Zahl kommt nach neunundneunzig?
-    expectedAnswer: Einhundert
+  - question: Which number comes after ninety-nine?
+    expectedAnswer: One hundred
     acceptedVariants:
     - '100'
-    - hundert
+    - a hundred
+    - hundred
     category: Mathematik
-  - question: Was wird nass, während es trocknet?
-    expectedAnswer: Ein Handtuch
+  - question: What gets wet while it dries?
+    expectedAnswer: A towel
     acceptedVariants:
-    - Handtuch
-    - das Handtuch
+    - towel
+    - the towel
     category: Rätsel

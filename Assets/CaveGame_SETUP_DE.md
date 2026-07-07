@@ -243,11 +243,12 @@ Das eigene 2 × 2-Meter-Rohmodell verwendet dafür X/Z-Scale **1.5** statt bishe
 
 Zusätzlich zur Hand lassen sich die Podest-Knöpfe per **Sprache** auslösen
 (`PodestVoiceControl`). Das Mikrofon hört **automatisch** zu, solange das Podest sichtbar ist
-(MainMenu / Game Over), und ist sonst aus (keine Fehlauslösung). Erkannte Befehle:
+(MainMenu / Game Over), und ist sonst aus (keine Fehlauslösung). Die Befehle werden auf
+**ENGLISCH** gesprochen (englisches Whisper-Modell, siehe 7c):
 
-- **Startbildschirm:** „Start", „Los", „Spiel", „Beginnen" … → Spiel starten
-- **Game Over:** „Neustart", „Nochmal", „Wiederholen" … → Neustart ·
-  „Menü", „Zurück", „Startbildschirm" … → Hauptmenü
+- **Startbildschirm:** „start", „go", „play", „begin" … → Spiel starten
+- **Game Over:** „restart", „again", „retry" … → Neustart ·
+  „menu", „back", „exit" … → Hauptmenü
 
 Auslösung folgt denselben Regeln wie der Hand-Knopf (nur im passenden Zustand, Cooldown,
 zuverlässiges Tracking). Es wird VAD-fenstergesteuert transkribiert (nur wenn jemand spricht).
@@ -256,7 +257,7 @@ zuverlässiges Tracking). Es wird VAD-fenstergesteuert transkribiert (nur wenn j
 Fehlt der Sprach-Stack/das Modell, bleibt einfach Hand + Tastatur aktiv.
 
 Der Bootstrapper legt den Sprach-Stack (WhisperManager + MicrophoneRecord + EchoMotionSpeechToText)
-automatisch an (Modell **small**, Sprache **de**), falls in der Szene keiner vorhanden ist. Ein
+automatisch an (Modell **small.en**, Sprache **en**), falls in der Szene keiner vorhanden ist. Ein
 selbst platzierter Stack hat Vorrang.
 
 Stellschrauben am `PodestVoiceControl`: die Keyword-Listen `startKeywords` / `restartKeywords` /
@@ -264,35 +265,37 @@ Stellschrauben am `PodestVoiceControl`: die Keyword-Listen `startKeywords` / `re
 
 ---
 
-## 7c. Whisper-Modell auf „medium" umstellen & herunterladen
+## 7c. Whisper-Modell: Englisch („small.en") & herunterladen
 
-Das Projekt nutzt jetzt überall das **medium**-Modell (statt small): nochmal deutlich besser bei
-deutscher Erkennung (wichtig für die Quiz-Antworten), dafür größer (~1,5 GB) und langsamer bei
-der Transkription. Die Konfiguration zeigt bereits auf `Whisper/ggml-medium.bin` (auto-erzeugter
-Stack **und** `test2.unity`). Die Modell-Datei selbst ist **nicht** im Git (zu groß) und muss
-**pro Rechner einmal** heruntergeladen werden.
+Das Projekt nutzt jetzt überall das **englische small-Modell** (`ggml-small.en.bin`): Die
+englische Erkennung ist deutlich zuverlässiger als die deutsche – **alle Sprachbefehle und
+Quiz-Antworten werden daher auf ENGLISCH gesprochen**. Die Whisper-Sprache steht auf `en`,
+die Quizfragen (`Resources/Quiz/QuizQuestions.asset`) und Podest-Befehle sind auf Englisch
+umgestellt. Die Modell-Datei selbst ist **nicht** im Git (zu groß) und muss **pro Rechner
+einmal** heruntergeladen werden.
 
 **Modell herunterladen (auf dem CAVE-/Main-Rechner):**
 
-1. Datei `ggml-medium.bin` (multilingual!) im Browser herunterladen:
-   <https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-medium.bin>
+1. Datei `ggml-small.en.bin` (~488 MB, nur Englisch) im Browser herunterladen:
+   <https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.en.bin>
    und nach `Assets/StreamingAssets/Whisper/` legen.
    (Übersicht aller Modelle: <https://huggingface.co/ggerganov/whisper.cpp/tree/main>.)
-   **Nicht** `ggml-medium.en.bin` nehmen – das ist nur Englisch.
+   **Auf die Endung `.en.bin` achten** – `ggml-small.bin` ohne `.en` ist das multilinguale Modell.
 2. In Unity kurz warten, bis der Import durch ist. Fertig – beim Start lädt der `WhisperManager`
-   automatisch `ggml-medium.bin`.
+   automatisch `ggml-small.en.bin`.
 
 **Wo das Modell konfiguriert ist (falls du es manuell ändern willst):**
-- `WhisperManager`-Komponente → Feld **Model Path** = `Whisper/ggml-medium.bin`,
-  **Is Model Path In Streaming Assets** = an, **Language** = `de`.
+- `WhisperManager`-Komponente → Feld **Model Path** = `Whisper/ggml-small.en.bin`,
+  **Is Model Path In Streaming Assets** = an, **Language** = `en`.
 - Auto-Stack: `GameBootstrapper.cs` → Konstante `VoiceModelRelativePath`.
 
 **Hinweise:**
 - `.gitignore` ignoriert `ggml-*.bin` bereits → wird nicht eingecheckt, jeder Rechner lädt es lokal.
 - Das alte `ggml-tiny.bin` (im Git, ~77 MB) wird nicht mehr verwendet. Optional entfernen:
   `git rm Assets/StreamingAssets/Whisper/ggml-tiny.bin` (dann committen).
-- Ein evtl. noch vorhandenes `ggml-small.bin` kann lokal gelöscht werden.
-- Anderes Modell gewünscht (z. B. zurück zu `small`)? Datei ablegen und denselben `ModelPath` anpassen.
+- Evtl. noch vorhandene `ggml-small.bin` / `ggml-medium.bin` können lokal gelöscht werden.
+- Zurück zu Deutsch? Multilinguales Modell ablegen, `ModelPath` + `language = "de"` anpassen und
+  Quizfragen/Podest-Befehle wieder auf Deutsch umstellen.
 
 ---
 
@@ -361,8 +364,9 @@ das Quiz nie verändert. Jede Frage kommt innerhalb eines Durchlaufs genau einma
 
 **Einmalige lokale Einrichtung:**
 
-1. Das mehrsprachige Whisper-Modell wie in Abschnitt 7c als
-   `Assets/StreamingAssets/Whisper/ggml-medium.bin` ablegen. Modell-Dateien sind absichtlich ignoriert.
+1. Das englische Whisper-Modell wie in Abschnitt 7c als
+   `Assets/StreamingAssets/Whisper/ggml-small.en.bin` ablegen. Modell-Dateien sind absichtlich
+   ignoriert. Die Quiz-Antworten werden auf **Englisch** gesprochen.
 2. [Ollama](https://ollama.com/) installieren und das Standardmodell laden:
    ```powershell
    ollama pull gemma3:4b

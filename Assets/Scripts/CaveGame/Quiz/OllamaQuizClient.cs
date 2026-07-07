@@ -22,7 +22,9 @@ namespace CaveGame.Quiz
 
         public async Task<OllamaQuizResult> EvaluateAsync(QuizQuestion question, string transcript, CancellationToken token)
         {
-            string prompt = "Bewerte die Antwort auf Deutsch. Akzeptiere sinngleiche Antworten. " +
+            string prompt = "Bewerte die Antwort auf eine Quizfrage. Frage und Musterlösung sind auf " +
+                            "Englisch, die Antwort stammt aus englischer Spracherkennung. Akzeptiere " +
+                            "sinngleiche Antworten (auch deutsche Übersetzungen der Lösung). " +
                             "Antworte ausschließlich als JSON mit correct (Boolean) und feedback (kurzer deutscher Satz).\n" +
                             "Frage: " + question.question + "\nMusterlösung: " + question.expectedAnswer +
                             "\nAkzeptierte Varianten: " + string.Join(", ", question.acceptedVariants ?? new System.Collections.Generic.List<string>()) +

@@ -21,21 +21,20 @@ namespace CaveGame
     /// </summary>
     public sealed class PodestVoiceControl : MonoBehaviour
     {
-        [Header("Sprachbefehle (Teilwort-Treffer, Groß/Klein & Satzzeichen egal)")]
+        [Header("Sprachbefehle (Teilwort-Treffer, Groß/Klein & Satzzeichen egal). " +
+                "ENGLISCH sprechen – das Whisper-Modell ist ein reines Englisch-Modell.")]
         public string[] startKeywords =
         {
-            "start", "starten", "los", "los gehts", "spiel", "spielen",
-            "beginne", "beginnen", "anfangen", "weiter", "go"
+            "start", "go", "play", "begin", "lets go", "ready", "game on"
         };
         public string[] restartKeywords =
         {
-            "neustart", "neu starten", "neustarten", "nochmal", "noch mal",
-            "nochmals", "noch einmal", "wiederhol", "wiederholen", "restart"
+            "restart", "again", "play again", "once more", "one more",
+            "retry", "new game"
         };
         public string[] menuKeywords =
         {
-            "menü", "menu", "menue", "hauptmenü", "hauptmenu", "hauptmenue",
-            "zurück", "zuruck", "startbildschirm", "beenden", "ende"
+            "menu", "main menu", "back", "home", "exit", "quit", "stop"
         };
 
         [Header("VAD")]
