@@ -13,51 +13,40 @@ MonoBehaviour:
   m_Name: QuizQuestions
   m_EditorClassIdentifier: 
   questions:
-  - question: What color is grass usually?
-    expectedAnswer: Green
+  - question: Wird eine Sammlung von Zeichen String genannt?
+    expectedAnswer: Yes
     acceptedVariants:
-    - green
-    - the color green
-    category: Allgemeinwissen
-  - question: What is one plus one?
-    expectedAnswer: Two
-    acceptedVariants:
-    - '2'
-    - two
-    category: Mathematik
-  - question: How many days are in a week?
-    expectedAnswer: Seven
-    acceptedVariants:
-    - '7'
-    - seven days
-    category: Allgemeinwissen
-  - question: What is five times two?
-    expectedAnswer: Ten
-    acceptedVariants:
-    - '10'
-    - ten
-    category: Mathematik
-  - question: Which planet is closest to the sun?
-    expectedAnswer: Mercury
-    acceptedVariants:
-    - the planet Mercury
-    category: Allgemeinwissen
-  - question: What do you call a program that displays websites?
-    expectedAnswer: Browser
-    acceptedVariants:
-    - web browser
-    - internet browser
+    - yes
+    - YES
+    - YEAH
+    - yeah
     category: Informatik
-  - question: Which number comes after ninety-nine?
-    expectedAnswer: One hundred
+  - question: Wird das Hochladen von Daten auf GitHub fetch genannt?
+    expectedAnswer: No
     acceptedVariants:
-    - '100'
-    - a hundred
-    - hundred
-    category: Mathematik
-  - question: What gets wet while it dries?
-    expectedAnswer: A towel
+    - no
+    - No
+    - NO
+    category: Informatik
+  - question: Ist ein Bug das gleiche wie ein Error?
+    expectedAnswer: No
     acceptedVariants:
-    - towel
-    - the towel
-    category: Rätsel
+    - NO
+    - no
+    - No
+    category: Informatik
+  - question: Wurde Windows von Microsoft entwickelt
+    expectedAnswer: Yes
+    acceptedVariants:
+    - yes
+    - YES
+    - yes
+    - Yes
+    category: Allgemeinwissen
+  - question: WWW = World Wide Wait
+    expectedAnswer: No
+    acceptedVariants:
+    - NO
+    - no
+    - Hell Nah
+    category: Allgemeinwissen
