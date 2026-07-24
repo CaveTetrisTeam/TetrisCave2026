@@ -1,0 +1,93 @@
+# .gitattributes für Unity (Cross-Platform Mac <-> Windows)
+# Ziel: einheitliche Zeilenenden, saubere Unity-YAML-Merges, keine EOL-Konvertierung bei Binaries.
+
+# Standard: Git erkennt Text automatisch und normalisiert intern auf LF.
+* text=auto
+
+#############################################
+## Quellcode / Text                        ##
+#############################################
+*.cs        text diff=csharp
+*.shader    text
+*.shadergraph text
+*.cginc     text
+*.hlsl      text
+*.compute   text
+*.json      text
+*.xml       text
+*.txt       text
+*.md        text
+*.uss       text
+*.uxml      text
+*.asmdef    text
+*.asmref    text
+
+#############################################
+## Unity YAML-Assets                        ##
+## -> als Text + Unity-eigener Merge-Treiber ##
+#############################################
+*.meta              text merge=unityyamlmerge
+*.unity             text merge=unityyamlmerge
+*.asset             text merge=unityyamlmerge
+*.prefab            text merge=unityyamlmerge
+*.mat               text merge=unityyamlmerge
+*.anim              text merge=unityyamlmerge
+*.controller        text merge=unityyamlmerge
+*.overrideController text merge=unityyamlmerge
+*.physicMaterial    text merge=unityyamlmerge
+*.physicsMaterial2D text merge=unityyamlmerge
+*.mask              text merge=unityyamlmerge
+*.spriteatlas       text merge=unityyamlmerge
+*.lighting          text merge=unityyamlmerge
+*.renderTexture     text merge=unityyamlmerge
+*.flare             text merge=unityyamlmerge
+*.guiskin           text merge=unityyamlmerge
+
+#############################################
+## Binärdateien (keine EOL-Konvertierung)   ##
+#############################################
+# Whisper-Modell
+*.bin       binary
+
+# Audio
+*.wav       binary
+*.mp3       binary
+*.ogg       binary
+*.aif       binary
+*.aiff      binary
+
+# Bilder / Texturen
+*.png       binary
+*.jpg       binary
+*.jpeg      binary
+*.gif       binary
+*.bmp       binary
+*.psd       binary
+*.tga       binary
+*.tif       binary
+*.tiff      binary
+*.exr       binary
+*.hdr       binary
+
+# 3D-Modelle
+*.fbx       binary
+*.obj       binary
+*.blend     binary
+*.dae       binary
+*.3ds       binary
+*.ma        binary
+*.mb        binary
+
+# Native Bibliotheken / Plugins
+*.dll       binary
+*.so        binary
+*.dylib     binary
+*.a         binary
+*.bundle    binary
+*.pdb       binary
+
+# Sonstiges
+*.unitypackage binary
+*.pdf       binary
+*.zip       binary
+*.7z        binary
