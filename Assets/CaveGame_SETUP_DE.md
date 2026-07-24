@@ -52,7 +52,7 @@ Alles ist idempotent und greift nur, wenn nötig. Manuell erneut auslösbar übe
 Assets/Scripts/CaveGame/
   Core/    GameState.cs, GameManager.cs, GameBootstrapper.cs
   Kinect/  KinectPlayerPresence.cs, KinectHandInteractor.cs
-  Button/  PhysicalStartPodestController.cs, PodestVoiceControl.cs
+  Button/  PhysicalStartPodestController.cs
   Gameplay/WallColliderBuilder.cs, Wall.cs, WallMover.cs, WallHitZone.cs,
            WallSpawner.cs, PlayerBodyPart.cs
   UI/      CaveUiFactory.cs, IngameHud.cs, SkeletonPreviewGraphic.cs, GameOverController.cs
@@ -200,13 +200,30 @@ einen mittigen Startknopf ein (bei Game Over zwei Knöpfe: Neustart / Menü). Ro
 stabil“, Grün = „startbereit“.
 
 **Auslösung (robust):** Statt eines winzigen, schwer zu treffenden Trigger-Cubes wird **distanzbasiert
-mit kurzem Halten** ausgelöst. Die getrackte (unsichtbare) Hand muss nur in die Nähe des Knopfes kommen
-(`activationRadius`, Standard 0.22 m) und dort kurz bleiben (`holdTime`, Standard 0.5 s). Der Knopf
-füllt sich dabei sichtbar von Grün → Druckfarbe und löst dann `GameManager.RequestStart()` aus. Das ist
-unempfindlich gegen Tracking-Jitter und gegen versehentliches Vorbeiwischen.
+mit kurzem Halten** ausgelöst. Die Erkennungszone ist ein **Zylinder über dem Knopf**: seitlich
+`activationRadius` (Standard 0.24 m), nach oben `verticalTolerance` (Standard 0.35 m) –
+die Hand schwebt naturgemäß *über* dem Knopf. Geprüft werden **beide** getrackten Hände (unabhängig
+geglättet), nicht mehr nur eine flatternde „aktive“ Handauswahl. Kurz halten (`holdTime`,
+Standard 0.5 s – lang genug, dass Vorbeiwischen nicht auslöst), dann löst der Knopf aus. Der Knopf
+füllt sich dabei sichtbar von Grün → Druckfarbe und **wächst** leicht mit dem Fortschritt.
+
+Gegen Tracking-Zittern gibt es zwei Sicherungen:
+- **Hysterese** (`holdZoneScale`, Standard 1.25): Während des Haltens wächst die Zone – kleines
+  Zittern bricht den Fortschritt nicht ab. Der gehaltene Knopf gewinnt außerdem knappe Duelle
+  gegen den Nachbarknopf (Game Over), damit der Fortschritt nicht ständig zurückspringt.
+- **Aussetzer-Gnadenfrist** (`dropoutGrace`, Standard 0.35 s): Verliert die Kinect die Hand kurz,
+  friert der Fortschritt ein, statt sich zu entleeren.
+
+Zu empfindlich (löst versehentlich aus)? → `activationRadius`/`verticalTolerance` verkleinern oder
+`holdTime` erhöhen. Zu schwergängig? → umgekehrt.
+
+**Neustart/Menü (Game Over) sind bewusst strenger** als der Start-Knopf, weil der Spieler dort
+noch in Bewegung direkt am Podest steht und die zwei Zonen sonst überlappen:
+`gameOverZoneScale` (Standard 0.75 = engere Zone), `gameOverHoldTime` (Standard 0.8 s) und
+`gameOverAppearGrace` (Standard 1.2 s Sperre nach dem Einblenden, bis die Arme zur Ruhe kommen).
 
 **Falls der Knopf weiterhin schwer erreichbar ist** („etwas weiter nach vorne“):
-- `activationRadius` am `PhysicalStartPodestController` erhöhen (z. B. 0.3) – verzeiht mehr Ungenauigkeit.
+- `activationRadius` / `verticalTolerance` am `PhysicalStartPodestController` weiter erhöhen.
 - Oder das **Podest** in der Szene näher zur Spielerposition / weiter nach vorne (Z) schieben; der
   Knopf folgt dem Podest. (Die Hand bewegt sich im gespiegelten Avatar-Raum – der Knopf muss dort
   liegen, wo die sichtbare Avatar-Hand hinreicht.)
@@ -222,59 +239,143 @@ Das eigene 2 × 2-Meter-Rohmodell verwendet dafür X/Z-Scale **1.5** statt bishe
 
 ---
 
-## 7b. Sprachsteuerung des Podests
+## 7b. Sprach-Stack (Whisper)
 
-Zusätzlich zur Hand lassen sich die Podest-Knöpfe per **Sprache** auslösen
-(`PodestVoiceControl`). Das Mikrofon hört **automatisch** zu, solange das Podest sichtbar ist
-(MainMenu / Game Over), und ist sonst aus (keine Fehlauslösung). Erkannte Befehle:
-
-- **Startbildschirm:** „Start", „Los", „Spiel", „Beginnen" … → Spiel starten
-- **Game Over:** „Neustart", „Nochmal", „Wiederholen" … → Neustart ·
-  „Menü", „Zurück", „Startbildschirm" … → Hauptmenü
-
-Auslösung folgt denselben Regeln wie der Hand-Knopf (nur im passenden Zustand, Cooldown,
-zuverlässiges Tracking). Es wird VAD-fenstergesteuert transkribiert (nur wenn jemand spricht).
-
-**Voraussetzungen:** ein Mikrofon am Rechner **und** das heruntergeladene Whisper-Modell (Abschnitt 7c).
-Fehlt der Sprach-Stack/das Modell, bleibt einfach Hand + Tastatur aktiv.
+Die Podest-Knöpfe werden per **Hand/Tastatur** bedient (die frühere Podest-Sprachsteuerung
+`PodestVoiceControl` wurde entfernt). Sprache wird nur noch für das **Avatar-Quiz** genutzt
+(Abschnitt zum Quiz weiter unten).
 
 Der Bootstrapper legt den Sprach-Stack (WhisperManager + MicrophoneRecord + EchoMotionSpeechToText)
-automatisch an (Modell **small**, Sprache **de**), falls in der Szene keiner vorhanden ist. Ein
+automatisch an (Modell **small.en**, Sprache **en**), falls in der Szene keiner vorhanden ist. Ein
 selbst platzierter Stack hat Vorrang.
 
-Stellschrauben am `PodestVoiceControl`: die Keyword-Listen `startKeywords` / `restartKeywords` /
-`menuKeywords` und `vadStopTime` (Stille bis zur Auswertung).
+**Voraussetzungen:** ein Mikrofon am Rechner **und** das heruntergeladene Whisper-Modell (Abschnitt 7c).
+Fehlt der Sprach-Stack/das Modell, läuft das Spiel normal weiter – nur das Quiz bleibt aus.
 
 ---
 
-## 7c. Whisper-Modell auf „small" umstellen & herunterladen
+## 7c. Whisper-Modell: Englisch („small.en") & herunterladen
 
-Das Projekt nutzt jetzt überall das **small**-Modell (statt tiny): besser bei deutscher Erkennung,
-dafür größer (~488 MB) und etwas langsamer. Die Konfiguration zeigt bereits auf
-`Whisper/ggml-small.bin` (auto-erzeugter Stack **und** `test2.unity`). Die Modell-Datei selbst ist
-**nicht** im Git (zu groß) und muss **pro Rechner einmal** heruntergeladen werden.
+Das Projekt nutzt jetzt überall das **englische small-Modell** (`ggml-small.en.bin`): Die
+englische Erkennung ist deutlich zuverlässiger als die deutsche – **die Quiz-Antworten werden
+daher auf ENGLISCH gesprochen**. Die Whisper-Sprache steht auf `en`, die Quizfragen
+(`Resources/Quiz/QuizQuestions.asset`) sind auf Englisch umgestellt. Die Modell-Datei selbst
+ist **nicht** im Git (zu groß) und muss **pro Rechner einmal** heruntergeladen werden.
 
 **Modell herunterladen (auf dem CAVE-/Main-Rechner):**
 
-1. Datei `ggml-small.bin` (multilingual!) besorgen – z. B. per Terminal:
-   ```bash
-   curl -L -o "Assets/StreamingAssets/Whisper/ggml-small.bin" \
-     https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin
-   ```
-   (oder im Browser von <https://huggingface.co/ggerganov/whisper.cpp/tree/main> laden und nach
-   `Assets/StreamingAssets/Whisper/` legen). **Nicht** `ggml-small.en.bin` nehmen – das ist nur Englisch.
+1. Datei `ggml-small.en.bin` (~488 MB, nur Englisch) im Browser herunterladen:
+   <https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.en.bin>
+   und nach `Assets/StreamingAssets/Whisper/` legen.
+   (Übersicht aller Modelle: <https://huggingface.co/ggerganov/whisper.cpp/tree/main>.)
+   **Auf die Endung `.en.bin` achten** – `ggml-small.bin` ohne `.en` ist das multilinguale Modell.
 2. In Unity kurz warten, bis der Import durch ist. Fertig – beim Start lädt der `WhisperManager`
-   automatisch `ggml-small.bin`.
+   automatisch `ggml-small.en.bin`.
 
 **Wo das Modell konfiguriert ist (falls du es manuell ändern willst):**
-- `WhisperManager`-Komponente → Feld **Model Path** = `Whisper/ggml-small.bin`,
-  **Is Model Path In Streaming Assets** = an, **Language** = `de`.
+- `WhisperManager`-Komponente → Feld **Model Path** = `Whisper/ggml-small.en.bin`,
+  **Is Model Path In Streaming Assets** = an, **Language** = `en`.
+- Auto-Stack: `GameBootstrapper.cs` → Konstante `VoiceModelRelativePath`.
 
 **Hinweise:**
-- `.gitignore` ignoriert `ggml-small*.bin` bereits → wird nicht eingecheckt, jeder Rechner lädt es lokal.
+- `.gitignore` ignoriert `ggml-*.bin` bereits → wird nicht eingecheckt, jeder Rechner lädt es lokal.
 - Das alte `ggml-tiny.bin` (im Git, ~77 MB) wird nicht mehr verwendet. Optional entfernen:
   `git rm Assets/StreamingAssets/Whisper/ggml-tiny.bin` (dann committen).
-- Anderes Modell gewünscht (z. B. `medium`)? Datei ablegen und denselben `ModelPath` anpassen.
+- Evtl. noch vorhandene `ggml-small.bin` / `ggml-medium.bin` können lokal gelöscht werden.
+- Zurück zu Deutsch? Multilinguales Modell ablegen, `ModelPath` + `language = "de"` anpassen und
+  Quizfragen/Podest-Befehle wieder auf Deutsch umstellen.
+
+---
+
+## 7d. Begleiter-Avatar (Blocky)
+
+Der animierte Blender-Avatar (`Assets/TetrisCave/Models/Resources/Avatar/tetris01.fbx`)
+wird vom `GameBootstrapper` automatisch als **Companion Avatar** in die Szene gelegt –
+kein manueller Schritt nötig.
+
+Was er tut:
+
+- **Menü (erster Besuch):** erklärt das Spielprinzip Schritt für Schritt per Sprechblasen,
+  danach erinnert er regelmäßig an den Podest-Knopf.
+- **Während der Runde:** schwirrt frei umher – im Frontbereich (`wanderCenter`/`wanderExtents`,
+  doppelt gewichtet) sowie an der **linken und rechten CAVE-Wand** (`sideWanderCenter`/
+  `sideWanderExtents`; rechte Zone, links gespiegelt; `(0,0,0)` schaltet die Seiten ab) –
+  und kommentiert jede Wand: Lob bei Erfolg, Serien-Sprüche ab 3 Wänden in Folge, Trost
+  bei Treffern, Warnung beim letzten Leben.
+- **Game Over:** kommentiert Punktzahl bzw. neuen Rekord und nennt die Knopf-Belegung.
+
+Technik/Anpassung:
+
+- Skripte: `Assets/Scripts/CaveGame/Avatar/` (`AvatarCompanion` = Logik & Texte,
+  `AvatarHoverMovement` = Schwebeflug, `AvatarSpeechBubble` = Sprechblase).
+  **Alle Texte und Positionen sind am `Companion Avatar`-Objekt im Inspector änderbar.**
+- Die Animation aus dem FBX wird per Playables abgespielt (kein AnimatorController-Asset);
+  ein `AssetPostprocessor` (`Assets/Editor/AvatarModelImportSettings.cs`) stellt die Clips
+  beim Import automatisch auf **Loop** und lässt Blender-Kamera/-Licht weg.
+- Die im FBX **einmodellierte Sprechblase** (Mesh `Text`, „Welche Form kam zuletzt?“)
+  wird zur Laufzeit ausgeblendet – Texte kommen ausschließlich aus der dynamischen
+  Sprechblase. Falls das Modell falsch herum schaut: `modelYawOffset` anpassen.
+- Das Modell erhält keine Collider und liegt nicht auf dem Player-Layer – es kann
+  also niemals Wand-Treffer auslösen.
+
+---
+
+## 7e. Soundeffekte (Fehler / Game Over)
+
+`Wall.errorSound` und `GameManager.gameOverSound` sind Inspector-Felder – aber GameManager und
+Wände werden **zur Laufzeit** erzeugt, daher füllt der `GameBootstrapper` bzw. `WallSpawner` die
+Felder automatisch aus `Resources`:
+
+- **Fehler-Sound** (Wandberührung): `Assets/TetrisCave/Sounds/Resources/Sfx/FalseSound.mp3`
+- **Game-Over-Sound**: `Assets/TetrisCave/Sounds/Resources/Sfx/GameOverSound.mp3`
+  (ehemals „Game Over #2 (Super Mario)…“ aus dem Sounds-Ordner; per `git mv` samt .meta
+  verschoben, Referenzen bleiben gültig)
+
+**Lautstärke:** Der Fehler-Sound wird beim Laden um `errorSoundBoost` (Standard 2.5×, am
+`WallSpawner`) direkt in den Audiodaten verstärkt, weil die Hintergrundmusik den Original-Clip
+übertönt – AudioSources können nicht zuverlässig über 100 % verstärken. Immer noch zu leise/laut?
+→ `errorSoundBoost` anpassen (1 = Original).
+
+**Sound tauschen:** einfach die MP3 in `Resources/Sfx/` durch eine gleichnamige Datei ersetzen –
+oder am `WallSpawner` (`errorSound`) manuell einen anderen Clip zuweisen. Abgespielt wird über
+die AudioSource des GameManagers (`PlayOneShot`), damit der Ton beim Despawnen der Wand nicht
+abreißt und laufende Musik nicht unterbrochen wird. Die übrigen Musik-Dateien liegen unverändert
+in `Assets/Samples/CAVE/1.1.1/CAVE Tools/Sounds/`.
+
+---
+
+## 7f. Avatar-Quiz mit Whisper und Ollama
+
+Bei 1000, 2000, 3000 usw. Punkten pausiert das Spiel vollständig. Blocky stellt eine zufällige
+Frage, Whisper erkennt die deutsche Antwort und Ollama bewertet sie. Punkte und Leben werden durch
+das Quiz nie verändert. Jede Frage kommt innerhalb eines Durchlaufs genau einmal vor.
+
+**Einmalige lokale Einrichtung:**
+
+1. Das englische Whisper-Modell wie in Abschnitt 7c als
+   `Assets/StreamingAssets/Whisper/ggml-small.en.bin` ablegen. Modell-Dateien sind absichtlich
+   ignoriert. Die Quiz-Antworten werden auf **Englisch** gesprochen.
+2. [Ollama](https://ollama.com/) installieren und das Standardmodell laden:
+   ```powershell
+   ollama pull gemma3:4b
+   ollama serve
+   ```
+3. Prüfen, dass `http://localhost:11434` erreichbar ist (Browser: „Ollama is running").
+   Modell, URL und 10-Sekunden-Timeout sind am Laufzeitobjekt `Avatar Quiz`
+   (`OllamaQuizClient`) austauschbar.
+   **Troubleshooting:** Steht in der `Player.log` beim Start `[AvatarQuiz] Ollama NICHT
+   erreichbar` bzw. bei einer Frage `Curl error 7 … localhost port 11434`, läuft Ollama
+   nicht → Ollama-App starten (Autostart in den Ollama-Einstellungen aktivieren!) oder in
+   der PowerShell `ollama serve`. Das Quiz funktioniert dann zwar über den lokalen
+   Wortvergleich weiter, aber ohne KI-Bewertung sinngleicher Antworten.
+4. Die aus `fragen.pdf` übernommene Datenbank muss als
+   `Assets/Resources/Quiz/QuizQuestions.asset` liegen. Über
+   `Assets > Create > Cave Game > Quiz Questions` lässt sie sich im Inspector anlegen und bearbeiten.
+
+Bei fehlendem Modell, nicht laufendem Ollama, Netzwerk-Timeout oder ungültigem JSON wird automatisch
+lokal gegen Musterlösung und Antwortvarianten verglichen. Nach acht Sekunden ohne Sprache startet
+die Aufnahme neu; nach drei erfolglosen Versuchen zeigt Blocky die Lösung und setzt das Spiel fort.
+Game Over und Menüwechsel brechen Aufnahme, Anfrage und Pause unmittelbar ab.
 
 ---
 

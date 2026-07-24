@@ -8,11 +8,14 @@ namespace CaveGame
     /// Während Tracking-Wartezeit und Spiel verschwindet das Podest.
     ///
     /// Auslösung (robust gemacht): Statt eines winzigen, schwer zu treffenden
-    /// OnTriggerEnter-Cubes wird DISTANZBASIERT mit kurzem HALTEN ausgelöst. Die
-    /// (unsichtbare) getrackte Hand muss nur in die Nähe des Knopfes kommen
-    /// (<see cref="activationRadius"/>) und dort kurz bleiben (<see cref="holdTime"/>).
-    /// Der Knopf füllt sich dabei sichtbar (Ready-Farbe → Druckfarbe). Das ist
-    /// unempfindlich gegen Tracking-Jitter und verhindert versehentliches Auslösen.
+    /// OnTriggerEnter-Cubes wird DISTANZBASIERT mit kurzem HALTEN ausgelöst.
+    /// Die Erkennungszone ist ein ZYLINDER über dem Knopf: seitlich
+    /// <see cref="activationRadius"/>, nach oben großzügig <see cref="verticalTolerance"/> –
+    /// die Hand schwebt naturgemäß ÜBER dem Knopf, nicht in ihm. Geprüft werden
+    /// BEIDE getrackten Hände. Während des Haltens wächst die Zone um
+    /// <see cref="holdZoneScale"/> (Hysterese gegen Zittern), und kurze Tracking-
+    /// Aussetzer frieren den Fortschritt ein (<see cref="dropoutGrace"/>), statt ihn
+    /// zu entleeren. Der Knopf füllt sich sichtbar (Farbe) und wächst leicht mit.
     /// </summary>
     public sealed class PhysicalStartPodestController : MonoBehaviour
     {
@@ -20,17 +23,37 @@ namespace CaveGame
 
         [Header("Tracking / Auslösung")]
         public bool requireReliableTracking = true;
-        [Tooltip("Reichweite: so nah muss die Hand am Knopf sein, damit er reagiert (Meter).")]
-        public float activationRadius = 0.22f;
-        [Tooltip("Haltezeit (Sek.), bis ausgelöst wird.")]
+        [Tooltip("Seitliche Reichweite: so nah (horizontal) muss eine Hand am Knopf sein (Meter).")]
+        public float activationRadius = 0.24f;
+        [Tooltip("Höhen-Toleranz: so weit ÜBER dem Knopf darf die Hand schweben (Meter).")]
+        public float verticalTolerance = 0.35f;
+        [Tooltip("Haltezeit (Sek.), bis ausgelöst wird. Lang genug, dass Vorbeiwischen nicht auslöst.")]
         public float holdTime = 0.5f;
+        [Tooltip("Hysterese: Während des Haltens wächst die Erkennungszone um diesen Faktor, " +
+                 "damit Tracking-Zittern den Fortschritt nicht abbricht.")]
+        public float holdZoneScale = 1.25f;
+        [Tooltip("Kurze Tracking-Aussetzer bis zu dieser Dauer (Sek.) frieren den Halte-" +
+                 "Fortschritt ein, statt ihn zu entleeren.")]
+        public float dropoutGrace = 0.35f;
         [Tooltip("Sperrzeit (Sek.) nach einer Auslösung.")]
         public float cooldown = 1.0f;
         [Tooltip("Kurze Sperre nach dem Einblenden, damit eine bereits dort liegende Hand nicht sofort startet.")]
         public float appearGracePeriod = 0.35f;
         [Tooltip("Horizontaler Abstand der beiden Game-Over-Knöpfe (links/rechts) in Metern, " +
                  "damit Neustart/Menü trotz großem Auslöse-Radius unterscheidbar sind.")]
-        public float gameOverButtonSeparation = 0.18f;
+        public float gameOverButtonSeparation = 0.26f;
+
+        [Header("Game-Over-Knöpfe (strenger als der Start-Knopf)")]
+        [Tooltip("Verkleinert die Erkennungszone von Neustart/Menü relativ zum Start-Knopf " +
+                 "(0.75 = 75 % von activationRadius/verticalTolerance). Die Zonen der beiden " +
+                 "Knöpfe überlappen sonst und reagieren auf jede Hand in Podestnähe.")]
+        public float gameOverZoneScale = 0.75f;
+        [Tooltip("Haltezeit (Sek.) für Neustart/Menü – bewusst länger, weil der Spieler bei " +
+                 "Game Over noch in Bewegung direkt am Podest steht.")]
+        public float gameOverHoldTime = 0.8f;
+        [Tooltip("Einblende-Sperre (Sek.) speziell nach Game Over: solange reagieren die " +
+                 "Knöpfe nicht, damit die noch schwingenden Arme nichts auslösen.")]
+        public float gameOverAppearGrace = 1.2f;
 
         [Header("Farben")]
         public Color waitingColor = new Color(0.85f, 0.16f, 0.10f);
@@ -56,6 +79,8 @@ namespace CaveGame
         private bool m_HasHeld;
         private PodestAction m_HeldAction;
         private float m_HoldProgress;
+        private float m_LastHoldContact = -999f;
+        private Vector3 m_ButtonBaseScale = Vector3.one;
 
         public void Initialize(GameObject podest)
         {
@@ -94,18 +119,21 @@ namespace CaveGame
             GameState state = manager != null ? manager.CurrentState : GameState.MainMenu;
             bool ready = !requireReliableTracking || (m_Presence != null && m_Presence.HasReliablePlayer);
 
-            // Welcher aktive Knopf liegt aktuell unter der Hand?
-            bool canInteract = manager != null && ready &&
-                               Time.unscaledTime - m_LastActivation >= cooldown &&
-                               Time.unscaledTime - m_ButtonShownAt >= appearGracePeriod &&
-                               m_Interactor != null && m_Interactor.HasHand;
+            // Grundvoraussetzungen (unabhängig vom Tracking-Aussetzer).
+            float appearGrace = state == GameState.GameOver ? gameOverAppearGrace : appearGracePeriod;
+            bool gateOpen = manager != null && ready &&
+                            Time.unscaledTime - m_LastActivation >= cooldown &&
+                            Time.unscaledTime - m_ButtonShownAt >= appearGrace;
 
+            // Welcher aktive Knopf liegt aktuell unter einer der beiden Hände?
             PodestAction candidate = default;
-            bool hasCandidate = canInteract &&
-                                TryGetTargetAction(state, m_Interactor.HandPosition, out candidate);
+            bool hasCandidate = gateOpen && m_Interactor != null &&
+                                (m_Interactor.HasLeftHand || m_Interactor.HasRightHand) &&
+                                TryGetTargetAction(state, out candidate);
 
             float dt = Time.unscaledDeltaTime;
-            float fill = 1f / Mathf.Max(0.05f, holdTime);
+            float effectiveHoldTime = state == GameState.GameOver ? gameOverHoldTime : holdTime;
+            float fill = 1f / Mathf.Max(0.05f, effectiveHoldTime);
 
             if (hasCandidate)
             {
@@ -117,59 +145,111 @@ namespace CaveGame
                 }
 
                 m_HoldProgress = Mathf.Min(1f, m_HoldProgress + dt * fill);
+                m_LastHoldContact = Time.unscaledTime;
 
                 if (m_HoldProgress >= 1f)
                 {
                     Activate(m_HeldAction);
                 }
             }
+            else if (m_HasHeld && Time.unscaledTime - m_LastHoldContact <= dropoutGrace)
+            {
+                // Kurzer Tracking-Aussetzer (Hand weg oder HasReliablePlayer flattert):
+                // Fortschritt einfrieren statt entleeren.
+            }
             else
             {
                 m_HasHeld = false;
-                m_HoldProgress = Mathf.Max(0f, m_HoldProgress - dt * fill * 2f);
+                m_HoldProgress = Mathf.Max(0f, m_HoldProgress - dt * fill);
             }
 
             UpdateColors(ready);
+            UpdateHoldScale();
         }
 
         // ------------------------------------------------------------------ Auslösung
 
-        private bool TryGetTargetAction(GameState state, Vector3 handPos, out PodestAction action)
+        private bool TryGetTargetAction(GameState state, out PodestAction action)
         {
             action = PodestAction.Start;
-            float best = activationRadius;
+            float bestScore = float.MaxValue;
             bool found = false;
 
             if (state == GameState.MainMenu)
             {
-                found |= Consider(m_StartButton, PodestAction.Start, handPos, ref best, ref action);
+                found |= Consider(m_StartButton, PodestAction.Start, ref bestScore, ref action);
             }
             else if (state == GameState.GameOver)
             {
-                found |= Consider(m_RestartButton, PodestAction.Restart, handPos, ref best, ref action);
-                found |= Consider(m_MenuButton, PodestAction.Menu, handPos, ref best, ref action);
+                found |= Consider(m_RestartButton, PodestAction.Restart, ref bestScore, ref action);
+                found |= Consider(m_MenuButton, PodestAction.Menu, ref bestScore, ref action);
             }
 
             return found;
         }
 
-        private static bool Consider(GameObject button, PodestAction candidate, Vector3 handPos,
-                                     ref float best, ref PodestAction action)
+        /// <summary>
+        /// Prüft, ob eine der beiden Hände in der Zylinder-Zone dieses Knopfes liegt.
+        /// Der aktuell gehaltene Knopf bekommt eine größere Zone (Hysterese) und einen
+        /// Score-Bonus, damit knappe Duelle zwischen zwei Knöpfen den Fortschritt
+        /// nicht ständig zurücksetzen.
+        /// </summary>
+        private bool Consider(GameObject button, PodestAction candidate,
+                              ref float bestScore, ref PodestAction action)
         {
             if (button == null || !button.activeInHierarchy)
             {
                 return false;
             }
 
-            float distance = Vector3.Distance(handPos, button.transform.position);
-            if (distance <= best)
+            bool isHeld = m_HasHeld && m_HeldAction.Equals(candidate);
+            float zoneScale = isHeld ? Mathf.Max(1f, holdZoneScale) : 1f;
+
+            // Neustart/Menü bekommen eine engere Zone als der Start-Knopf.
+            if (candidate != PodestAction.Start)
             {
-                best = distance;
-                action = candidate;
-                return true;
+                zoneScale *= Mathf.Clamp(gameOverZoneScale, 0.2f, 1f);
             }
 
-            return false;
+            float nearest = float.MaxValue;
+            if (m_Interactor.HasLeftHand)
+            {
+                ConsiderHand(button, m_Interactor.LeftHandPosition, zoneScale, ref nearest);
+            }
+            if (m_Interactor.HasRightHand)
+            {
+                ConsiderHand(button, m_Interactor.RightHandPosition, zoneScale, ref nearest);
+            }
+
+            if (nearest == float.MaxValue)
+            {
+                return false;
+            }
+
+            float score = isHeld ? nearest * 0.6f : nearest;
+            if (score < bestScore)
+            {
+                bestScore = score;
+                action = candidate;
+            }
+
+            return true;
+        }
+
+        /// <summary>Zylinder-Test: seitlich eng, nach oben großzügig (Hand schwebt über dem Knopf).</summary>
+        private void ConsiderHand(GameObject button, Vector3 hand, float zoneScale, ref float nearest)
+        {
+            Vector3 delta = hand - button.transform.position;
+            float horizontal = new Vector2(delta.x, delta.z).magnitude;
+
+            // Leicht unterhalb zulassen (Kalibrier-Ungenauigkeit), nach oben verticalTolerance.
+            bool inZone = horizontal <= activationRadius * zoneScale &&
+                          delta.y >= -0.10f &&
+                          delta.y <= verticalTolerance * zoneScale;
+            if (inZone)
+            {
+                nearest = Mathf.Min(nearest, horizontal);
+            }
         }
 
         /// <summary>
@@ -323,7 +403,8 @@ namespace CaveGame
             button.transform.localPosition = new Vector3(-0.0002f, 0f, 0.04529f);
             button.transform.localRotation =
                 new Quaternion(0.3265056f, 0.3265056f, 0.6272114f, 0.6272114f);
-            button.transform.localScale = new Vector3(0.0066666664f, 0.0015f, 0.006666667f);
+            m_ButtonBaseScale = new Vector3(0.0066666664f, 0.0015f, 0.006666667f);
+            button.transform.localScale = m_ButtonBaseScale;
 
             // Collider bleibt als Trigger erhalten (schadet nicht); ausgelöst wird per Distanz+Halten.
             button.GetComponent<BoxCollider>().isTrigger = true;
@@ -348,6 +429,27 @@ namespace CaveGame
             UpdateButtonColor(m_StartMaterial, PodestAction.Start, ready ? readyColor : waitingColor);
             UpdateButtonColor(m_RestartMaterial, PodestAction.Restart, ready ? readyColor : waitingColor);
             UpdateButtonColor(m_MenuMaterial, PodestAction.Menu, ready ? menuColor : waitingColor);
+        }
+
+        /// <summary>Der gehaltene Knopf wächst sichtbar mit dem Fortschritt (bis +35 %).</summary>
+        private void UpdateHoldScale()
+        {
+            ApplyHoldScale(m_StartButton, PodestAction.Start);
+            ApplyHoldScale(m_RestartButton, PodestAction.Restart);
+            ApplyHoldScale(m_MenuButton, PodestAction.Menu);
+        }
+
+        private void ApplyHoldScale(GameObject button, PodestAction action)
+        {
+            if (button == null)
+            {
+                return;
+            }
+
+            float pulse = m_HasHeld && m_HeldAction.Equals(action)
+                ? 1f + 0.35f * m_HoldProgress
+                : 1f;
+            button.transform.localScale = m_ButtonBaseScale * pulse;
         }
 
         private void UpdateButtonColor(Material material, PodestAction action, Color baseColor)

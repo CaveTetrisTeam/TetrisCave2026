@@ -20,6 +20,15 @@ namespace CaveGame
         [Tooltip("Resources-Unterordner mit den Wand-PNGs (als Texture2D geladen).")]
         public string resourcesFolder = "Walls";
 
+        [Header("Audio")]
+        [Tooltip("Fehler-Sound bei Wandberührung. Leer = automatisch aus Resources/Sfx/FalseSound laden.")]
+        public AudioClip errorSound;
+        [Range(1f, 4f)]
+        [Tooltip("Verstärkung des Fehler-Sounds (1 = Original). Wird beim Laden direkt in die " +
+                 "Audiodaten eingerechnet, weil die Hintergrundmusik den Original-Clip übertönt. " +
+                 "AudioSources können nicht zuverlässig über 100 % verstärken.")]
+        public float errorSoundBoost = 2.5f;
+
         [Header("Platzierung (Weltkoordinaten)")]
         [Tooltip("Z-Position, an der Wände erscheinen (weit vorne).")]
         public float spawnZ = 40f;
@@ -91,8 +100,60 @@ namespace CaveGame
         private void Awake()
         {
             EnsureSprites();
+            if (errorSound == null)
+            {
+                errorSound = Resources.Load<AudioClip>("Sfx/FalseSound");
+                if (errorSound == null)
+                {
+                    Debug.LogWarning("[WallSpawner] Fehler-Sound 'Resources/Sfx/FalseSound' nicht " +
+                                     "gefunden – Wandtreffer bleiben stumm.");
+                }
+            }
+            StartCoroutine(BoostErrorSound());
             m_PlayerPresence = FindObjectOfType<KinectPlayerPresence>(true);
             CalibrateForCurrentPlayer();
+        }
+
+        /// <summary>
+        /// Rechnet <see cref="errorSoundBoost"/> einmalig in die Audiodaten des
+        /// Fehler-Sounds ein (mit Clipping-Begrenzung). Läuft als Coroutine, weil
+        /// die Audiodaten (preload aus) erst asynchron geladen werden; Wände
+        /// spawnen ohnehin erst deutlich später im Zustand Playing.
+        /// </summary>
+        private IEnumerator BoostErrorSound()
+        {
+            if (errorSound == null || errorSoundBoost <= 1.01f)
+            {
+                yield break;
+            }
+
+            errorSound.LoadAudioData();
+            float timeout = Time.realtimeSinceStartup + 5f;
+            while (errorSound.loadState == AudioDataLoadState.Loading &&
+                   Time.realtimeSinceStartup < timeout)
+            {
+                yield return null;
+            }
+
+            var data = new float[errorSound.samples * errorSound.channels];
+            if (errorSound.loadState != AudioDataLoadState.Loaded || !errorSound.GetData(data, 0))
+            {
+                Debug.LogWarning("[WallSpawner] Fehler-Sound konnte nicht verstärkt werden " +
+                                 "(Audiodaten nicht lesbar; Import muss 'Decompress On Load' sein) – " +
+                                 "spiele Original-Lautstärke.");
+                yield break;
+            }
+
+            for (int i = 0; i < data.Length; i++)
+            {
+                data[i] = Mathf.Clamp(data[i] * errorSoundBoost, -1f, 1f);
+            }
+
+            var boosted = AudioClip.Create(errorSound.name + " (verstärkt)",
+                                           errorSound.samples, errorSound.channels,
+                                           errorSound.frequency, false);
+            boosted.SetData(data, 0);
+            errorSound = boosted;
         }
 
         // ---------------------------------------------------------------------
@@ -229,7 +290,16 @@ namespace CaveGame
             body.interpolation = RigidbodyInterpolation.Interpolate;
             body.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
 
-            go.AddComponent<Wall>();
+            // Fehler-Sound verdrahten: Der Clip kommt aus Resources, abgespielt wird
+            // über die AudioSource des (unzerstörbaren) GameManagers – so wird der
+            // Ton nicht abgeschnitten, wenn die Wand kurz danach despawnt.
+            var wallComponent = go.AddComponent<Wall>();
+            wallComponent.errorSound = errorSound;
+            // Voll qualifiziert, weil Windows.Kinect ebenfalls eine AudioSource definiert.
+            wallComponent.globalAudioSource = GameManager.Instance != null
+                ? GameManager.Instance.GetComponent<UnityEngine.AudioSource>()
+                : null;
+
             var hitZone = go.AddComponent<WallHitZone>();
             hitZone.playerLayers = playerLayers;
 

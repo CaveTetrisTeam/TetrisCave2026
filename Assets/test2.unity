@@ -159,12 +159,12 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   logLevel: 1
-  modelPath: Whisper/ggml-small.bin
+  modelPath: Whisper/ggml-small.en.bin
   isModelPathInStreamingAssets: 1
   initOnAwake: 1
   useGpu: 0
   flashAttention: 0
-  language: de
+  language: en
   translateToEnglish: 0
   strategy: 0
   noContext: 1

@@ -159,6 +159,7 @@ MonoBehaviour:
   particlePrefab: {fileID: 3486334340852444976, guid: 30d18ae04d04bb54999a282dc8707577, type: 3}
   collisionSound: {fileID: 8300000, guid: 89d1fcd2b23a3894fb3a294bda493116, type: 3}
   hideSourceActorRenderers: 1
+  showWorldAvatar: 0
 --- !u!4 &62372940
 Transform:
   m_ObjectHideFlags: 0
@@ -2696,7 +2697,14 @@ MonoBehaviour:
   - {fileID: 8300000, guid: 051903949069ad64eb01e382d5133e11, type: 3}
   - {fileID: 8300000, guid: 5a58750fdd5bcba45b8bb207b1803eba, type: 3}
   - {fileID: 8300000, guid: 6f6b5fbc5bb838d42b651b6319237ed6, type: 3}
+  - {fileID: 8300000, guid: 7cefc33a25100c643932ba353b5ccac7, type: 3}
+  - {fileID: 8300000, guid: 552e9117d82fe68468b6a85f6d511908, type: 3}
   - {fileID: 8300000, guid: 37ca7818f88c4a04c963d3285615739e, type: 3}
+  - {fileID: 8300000, guid: 6f6b5fbc5bb838d42b651b6319237ed6, type: 3}
+  - {fileID: 8300000, guid: 15e8c0b8a9b06a041bf66e0de80f9215, type: 3}
+  - {fileID: 8300000, guid: c54a5bf83fded90439bbdd56ce18b8b2, type: 3}
+  - {fileID: 8300000, guid: 5a58750fdd5bcba45b8bb207b1803eba, type: 3}
+  - {fileID: 8300000, guid: 685bcc8d78ae8ce459ff7d919a8ddfd7, type: 3}
 --- !u!1 &1202135181
 GameObject:
   m_ObjectHideFlags: 0

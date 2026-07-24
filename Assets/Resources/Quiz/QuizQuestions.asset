@@ -1,0 +1,52 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a1100000000000000000000000000008, type: 3}
+  m_Name: QuizQuestions
+  m_EditorClassIdentifier: 
+  questions:
+  - question: Wird eine Sammlung von Zeichen String genannt?
+    expectedAnswer: Yes
+    acceptedVariants:
+    - yes
+    - YES
+    - YEAH
+    - yeah
+    category: Informatik
+  - question: Wird das Hochladen von Daten auf GitHub fetch genannt?
+    expectedAnswer: No
+    acceptedVariants:
+    - no
+    - No
+    - NO
+    category: Informatik
+  - question: Ist ein Bug das gleiche wie ein Error?
+    expectedAnswer: No
+    acceptedVariants:
+    - NO
+    - no
+    - No
+    category: Informatik
+  - question: Wurde Windows von Microsoft entwickelt
+    expectedAnswer: Yes
+    acceptedVariants:
+    - yes
+    - YES
+    - yes
+    - Yes
+    category: Allgemeinwissen
+  - question: WWW = World Wide Wait
+    expectedAnswer: No
+    acceptedVariants:
+    - NO
+    - no
+    - Hell Nah
+    category: Allgemeinwissen

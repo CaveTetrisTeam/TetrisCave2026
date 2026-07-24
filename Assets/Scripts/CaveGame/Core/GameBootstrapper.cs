@@ -3,6 +3,7 @@ using UnityEngine;
 using HTW.CAVE;
 using Whisper;
 using Whisper.Utils;
+using CaveGame.Quiz;
 
 namespace CaveGame
 {
@@ -24,13 +25,13 @@ namespace CaveGame
             EnsureKinect();
             ConfigureMonoCaveProjection();
             EnsureWallSpawner();
+            EnsureGameAudio();
             EnsureUi();
+            EnsureCompanionAvatar();
+            EnsureSpeechToText();
+            EnsureAvatarQuiz();
             RemoveSampleToggleButtons();
-            // Sprachsteuerung vorerst deaktiviert (kein Spielstart per Stimme).
-            // Zum Reaktivieren einfach die beiden folgenden Aufrufe wieder einkommentieren:
-            // EnsureSpeechToText();
             EnsurePhysicalStartPodest();
-            // EnsureVoiceControl();
             ApplyReferencePlatformSize();
         }
 
@@ -112,6 +113,41 @@ namespace CaveGame
         }
 
         /// <summary>
+        /// Verdrahtet die Soundeffekte: Da GameManager und Wände zur Laufzeit erzeugt
+        /// werden, können die AudioClip-Felder nicht im Inspector gesetzt werden –
+        /// die Clips kommen deshalb aus <c>Resources/Sfx</c>. Der Fehler-Sound wird
+        /// vom <see cref="WallSpawner"/> an jede Wand weitergereicht.
+        /// </summary>
+        private static void EnsureGameAudio()
+        {
+            var manager = Object.FindObjectOfType<GameManager>(true);
+            if (manager != null && manager.gameOverSound == null)
+            {
+                manager.gameOverSound = Resources.Load<AudioClip>("Sfx/GameOverSound");
+                if (manager.gameOverSound == null)
+                {
+                    Debug.LogWarning("[GameBootstrapper] Game-Over-Sound 'Resources/Sfx/GameOverSound' " +
+                                     "nicht gefunden – Game Over bleibt stumm.");
+                }
+            }
+        }
+
+        /// <summary>
+        /// Erzeugt den Begleiter-Avatar (schwebendes Blender-Modell mit Sprechblasen),
+        /// der das Spielprinzip erklärt und die Runde kommentiert.
+        /// </summary>
+        private static void EnsureCompanionAvatar()
+        {
+            if (Object.FindObjectOfType<AvatarCompanion>(true) != null)
+            {
+                return;
+            }
+
+            var go = new GameObject("Companion Avatar");
+            go.AddComponent<AvatarCompanion>();
+        }
+
+        /// <summary>
         /// Entfernt die vier CAVE-Sample-Knöpfe (ObjectToggleButton), die sonst parallel
         /// zum eigenen Podest-Knopf stehen blieben.
         /// </summary>
@@ -163,13 +199,22 @@ namespace CaveGame
         /// auf das kleine Modell und Deutsch. Das GameObject wird inaktiv erzeugt, damit
         /// Modellpfad/Sprache gesetzt werden, BEVOR der WhisperManager im Awake lädt.
         /// </summary>
-        private const string VoiceModelRelativePath = "Whisper/ggml-small.bin";
+        private const string VoiceModelRelativePath = "Whisper/ggml-small.en.bin";
 
         private static void EnsureSpeechToText()
         {
-            if (Object.FindObjectOfType<EchoMotionSpeechToText>(true) != null)
+            var existingStt = Object.FindObjectOfType<EchoMotionSpeechToText>(true);
+            if (existingStt != null)
             {
-                return; // bereits vorhanden (z. B. manuell platziert) -> respektieren
+                if (Object.FindObjectOfType<EchoMotionVoiceQuestion>(true) == null)
+                {
+                    var existingQuestion = existingStt.gameObject.AddComponent<EchoMotionVoiceQuestion>();
+                    existingQuestion.speechToText = existingStt;
+                    existingQuestion.microphoneRecord = existingStt.microphoneRecord;
+                    existingQuestion.noSpeechTimeout = 8f;
+                    existingQuestion.maxAttempts = 3;
+                }
+                return; // manuelle Whisper-Konfiguration respektieren
             }
 
             // Ohne vorhandene Modell-Datei NICHT initialisieren – sonst wirft der
@@ -179,7 +224,7 @@ namespace CaveGame
             if (!File.Exists(modelFullPath))
             {
                 Debug.LogWarning("[GameBootstrapper] Sprachmodell nicht gefunden: " + modelFullPath +
-                                 "\nSprachsteuerung ist deaktiviert. Lege 'ggml-small.bin' in " +
+                                 "\nSprachsteuerung ist deaktiviert. Lege 'ggml-small.en.bin' in " +
                                  "Assets/StreamingAssets/Whisper/ ab (siehe CaveGame_SETUP_DE.md, Abschnitt 7c).");
                 return;
             }
@@ -192,14 +237,34 @@ namespace CaveGame
                 var whisper = go.AddComponent<WhisperManager>();
                 whisper.IsModelPathInStreamingAssets = true;
                 whisper.ModelPath = VoiceModelRelativePath;
-                whisper.language = "de";
+                // ggml-*.en.bin ist ein reines Englisch-Modell -> Antworten/Befehle
+                // werden auf ENGLISCH gesprochen (bessere Erkennung in der CAVE).
+                whisper.language = "en";
+                // Kleineres Audio-Kontextfenster: beschleunigt die CPU-Inferenz kurzer
+                // Antworten massiv (Player.log: ~6,4 s pro Antwort). 768 von 1500
+                // entspricht ~15 s Audio – mehr nehmen wir ohnehin nicht mehr auf.
+                whisper.audioCtx = 768;
 
                 var mic = go.AddComponent<MicrophoneRecord>();
+                // Standardmäßig spielt MicrophoneRecord jede Aufnahme als "Echo" über
+                // die Lautsprecher zurück – in der CAVE unerwünscht (Störschall).
+                mic.echo = false;
+                // Harte Obergrenze pro Aufnahme: Bei Dauerlärm stoppte die VAD nie,
+                // die Aufnahme lief bis 60 s und die anschließende Whisper-Inferenz
+                // fror das Spiel gefühlt minutenlang ein ("hängt sich auf").
+                mic.maxLengthSec = 12;
 
                 var stt = go.AddComponent<EchoMotionSpeechToText>();
                 stt.whisper = whisper;
                 stt.microphoneRecord = mic;
                 stt.autoInitWhisper = true;
+
+                var question = go.AddComponent<EchoMotionVoiceQuestion>();
+                question.speechToText = stt;
+                question.microphoneRecord = mic;
+                question.noSpeechTimeout = 8f;
+                question.maxAttempts = 3;
+                question.configureVad = true;
 
                 go.SetActive(true);
             }
@@ -210,15 +275,29 @@ namespace CaveGame
             }
         }
 
-        private static void EnsureVoiceControl()
+        private static void EnsureAvatarQuiz()
         {
-            if (Object.FindObjectOfType<PodestVoiceControl>(true) != null)
+            if (Object.FindObjectOfType<AvatarQuizController>(true) != null) return;
+
+            var voice = Object.FindObjectOfType<EchoMotionVoiceQuestion>(true);
+            if (voice == null)
             {
+                Debug.LogWarning("[GameBootstrapper] Avatar-Quiz bleibt aus, weil Whisper nicht eingerichtet ist.");
                 return;
             }
 
-            var go = new GameObject("Podest Voice Control");
-            go.AddComponent<PodestVoiceControl>();
+            var go = new GameObject("Avatar Quiz");
+            go.SetActive(false);
+            var ollama = go.AddComponent<OllamaQuizClient>();
+            var quiz = go.AddComponent<AvatarQuizController>();
+            quiz.avatar = Object.FindObjectOfType<AvatarCompanion>(true);
+            quiz.voiceQuestion = voice;
+            quiz.ollama = ollama;
+            quiz.questionDatabase = Resources.Load<QuizQuestionDatabase>("Quiz/QuizQuestions");
+            if (quiz.questionDatabase == null)
+                Debug.LogWarning("[GameBootstrapper] Resources/Quiz/QuizQuestions fehlt; bitte Fragen-Datenbank zuweisen.");
+            quiz.RebuildDeck();
+            go.SetActive(true);
         }
 
         /// <summary>
