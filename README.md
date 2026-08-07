@@ -158,11 +158,3 @@ Das Whisper-Modell selbst ist nicht Bestandteil des Repositorys und muss separat
 - Quizfragen: `Assets/Resources/Quiz/QuizQuestions.asset`
 - Whisper: `com.whisper.unity` für Speech-to-Text; das benötigte Modell wird separat eingebunden
 
-## Team
-
-Das Projekt wurde für den Einsatz in der CAVE der HTW Berlin entwickelt.
-
-Die Namen der Studierenden und der Betreuung sind in den bereitgestellten TetrisCave-Projektdateien nicht hinterlegt und können hier ergänzt werden:
-
-- Studierende: [ergänzen]
-- Betreuung: [ergänzen]
